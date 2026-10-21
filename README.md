@@ -1,10 +1,21 @@
 # INKFORMA — Estudio de tatuajes
 
-Primera versión de una web de estudio con probador 3D, creada con JavaScript, Vite y Three.js. INKFORMA es un nombre provisional; el contacto y la identidad del estudio se deben personalizar antes de publicar.
+Web de estudio con probador anatómico 3D, creada con JavaScript, Vite y Three.js. INKFORMA es un nombre provisional; personalizar información y contacto antes de publicar.
 
-## Desarrollo
+## Ejecutar en Windows
 
-Requiere Node.js 22.12+ (validado con Node 24).
+Instalar Node.js 22.12 o superior y abrir una terminal en la carpeta que contiene `package.json`:
+
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
+
+Abrir la dirección que muestra Vite. Mantener abierta la terminal. Para obtener esta versión desde GitHub, descargar de nuevo **Code → Download ZIP**, descomprimir en una carpeta nueva y ejecutar esos comandos. Los modelos GLB ya vienen incluidos; no hace falta instalar Blender.
+
+## Entorno de desarrollo
+
+Validado con Node 24. Desde el checkout existente:
 
 ```sh
 cd /workspace/appweb
@@ -12,23 +23,43 @@ npm ci --cache /tmp/inkforma-npm
 npm run dev -- --port 5173
 ```
 
-Para producción: `npm run build`. Los archivos generados quedan en `dist/`; `npm run preview` permite comprobarlos.
+`npm run build` genera producción en `dist/`; `npm run preview` permite comprobarla. Publicar el contenido de `dist/` en un alojamiento estático situado en la raíz de un dominio. Si se usa una subcarpeta, configurar `base` de Vite antes de compilar.
 
-## Probador
+## Usar el probador
 
-- Arrastrar gira el cuerpo; la rueda permite acercar o alejar.
-- Elegir modelo masculino o femenino, tres contexturas y color de piel.
-- Subir PNG, JPG o WEBP (hasta 10 MB); hacer clic en el cuerpo para colocar el tatuaje. Ajustar tamaño y rotación. Al cambiar el cuerpo, volver a colocar el diseño.
-- El filtro elimina píxeles claros con un umbral ajustable. Para dibujos blancos o diseños con tonos claros, desactivarlo y usar PNG transparente. No realiza segmentación de fondos complejos.
-- La biblioteca guarda imágenes procesadas y preferencias corporales en localStorage de este navegador. No guarda la posición 3D del tatuaje, no sincroniza dispositivos y no requiere cuenta. Se puede descargar cada PNG y capturar una vista del cuerpo.
-- Las imágenes se procesan localmente; no se envían a un servidor. El almacenamiento del navegador es limitado. Descargar copias para conservarlas.
+1. Elegir cuerpo masculino o femenino, contextura y tono de piel.
+2. Subir PNG, JPG o WEBP (hasta 10 MB). Al cargar, se activa **Mover tatuaje**.
+3. Pulsar y arrastrar sobre cualquier zona visible de piel para colocar o mover el diseño. Funciona con ratón o dedo. Si se sale de la silueta, se conserva la última posición válida.
+4. Cambiar a **Girar cuerpo** para rotar y acercar la cámara con rueda o gesto de dos dedos. Las vistas Frente, Espalda y Perfil facilitan elegir otra zona. Volver a Mover tatuaje para seguir colocándolo.
+5. Ajustar tamaño, rotación e intensidad; reflejar el diseño o retirarlo de la piel.
+6. Guardar en biblioteca. Se conservan imagen procesada, cuerpo, tono y posición 3D con tamaño, rotación, intensidad y reflejo. **Usar** recupera la colocación. Los diseños guardados en la versión anterior siguen disponibles, aunque no tenían posición guardada.
+7. Descargar el PNG o capturar la vista actual del cuerpo.
 
-## Modelos y siguientes mejoras
+Al cambiar de cuerpo se retira la colocación actual para evitar proyectar sobre una anatomía diferente; el diseño cargado permanece disponible.
 
-Los cuerpos actuales se generan con primitivas geométricas. Sirven para validar la interacción; no son modelos anatómicos de producción. La proyección se limita a la pieza corporal seleccionada y puede cortarse en uniones.
+El filtro de fondo elimina tonos blancos o claros con un umbral ajustable. Para tatuajes blancos, desactivarlo y usar PNG transparente. No realiza segmentación de fotografías con fondos complejos.
 
-Para producción recomiendo crear o adquirir con licencia dos mallas anatómicas en Blender, con UV sin solapamientos y topología continua, y exportar en GLB/glTF. Crear morph targets de contextura sobre la misma topología; usar un material de piel separado y conservar escala y orientación coherentes. Integrarlos con GLTFLoader y sustituir el generador actual. Una malla continua mejora la proyección en articulaciones. Para guardar colocaciones, almacenar modelo, transformaciones del decal y diseño en una base de datos con almacenamiento de imágenes.
+La biblioteca usa localStorage de este navegador: no sincroniza dispositivos ni requiere cuenta. El espacio es limitado; descargar copias. Las imágenes se procesan localmente y no se envían a un servidor.
 
-Para fondos fotográficos complejos, integrar un modelo de segmentación en navegador o un servicio con servidor; no exponer claves en el frontend. La web actual no incluye autenticación, reservas, pagos ni backend.
+## Modelos anatómicos
 
-Las fuentes de Google son opcionales: la interfaz tiene fuentes de respaldo si no hay conexión. WebGL es necesario para el visor; sin él se puede seguir subiendo y guardando diseños.
+Se incluyen cuerpos adultos MakeHuman, con rostro, manos y dedos, en GLB: dos archivos de aproximadamente 1.95 MB, con tres contexturas cada uno. Se descargan desde el propio sitio y se reutilizan en memoria al cambiar de contextura. La anatomía sustituye a los maniquíes geométricos de la primera versión.
+
+Las mallas y los targets originales son CC0 1.0. Fuentes, autores, licencia y commit de origen en [public/models/ATTRIBUTION.md](public/models/ATTRIBUTION.md). El conversor reproducible es `scripts/build-body-models.py`; no se incluye código de la aplicación MakeHuman.
+
+La piel tiene un acabado de escultura con iluminación de estudio, sin texturas fotográficas. Para más realismo se pueden editar los modelos en Blender y añadir texturas PBR de piel con licencia adecuada. La proyección se adhiere a la malla continua y se orienta con las normales de la superficie. Diseños muy grandes o zonas de curvatura extrema pueden recortarse; reducir el tamaño y ajustar la zona. No equivale a una simulación del resultado real del tatuaje.
+
+## Validación
+
+```sh
+npm install
+npx playwright install chromium
+npm test
+npm run build
+```
+
+En PowerShell usar `npm.cmd` y `npx.cmd`. Las pruebas usan Chromium instalado con Playwright; si existe `/usr/bin/chromium`, lo reutilizan. Se puede indicar otro ejecutable con `CHROMIUM_PATH`.
+
+Las pruebas cubren las seis variantes de anatomía, quitar fondo claro, arrastre y colocación, separación entre cámara y diseño, recuperación de posición, exportación, gestos táctiles, anchura móvil y recuperación tras errores al cargar modelos.
+
+WebGL es necesario para el visor. Sin él se puede seguir subiendo y guardando imágenes. Las fuentes de Google son opcionales, con tipografías de respaldo. La web no incluye backend, autenticación, reservas ni pagos.
