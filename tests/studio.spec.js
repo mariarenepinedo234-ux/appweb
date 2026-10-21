@@ -81,3 +81,58 @@ test('failed model load shows recovery and retry succeeds',async({page})=>{
  await page.unroute('**/models/male.glb');await page.locator('#build').selectOption('delgada');
  await expect(page.locator('#canvas')).toHaveAttribute('data-model-state','ready');
 });
+
+async function sampleFrame(page){
+ return page.locator('#canvas canvas').evaluate(async canvas=>{
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const copy=document.createElement('canvas');copy.width=320;copy.height=Math.round(320*canvas.height/canvas.width);const ctx=copy.getContext('2d');ctx.drawImage(canvas,0,0,copy.width,copy.height);return Array.from(ctx.getImageData(0,0,copy.width,copy.height).data);
+ });
+}
+
+test('isolated zones retain bracelet ink on front, back and both sides',async({page})=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ page.on('console',msg=>{if(msg.type()==='error'&&/shader|THREE.WebGLProgram/.test(msg.text()))errors.push(msg.text());});
+ await openStudio(page);await page.locator('#demo-band').click();
+ await expect(page.locator('#canvas')).toHaveAttribute('data-tattoo-type','band');
+ await expect(page.locator('#zone')).toHaveValue('forearm-left');await expect(page.locator('#canvas')).toHaveAttribute('data-isolated','true');
+ await page.locator('#mode-orbit').click();
+ for(const view of ['front','back','left','right']){
+  await page.locator(`[data-view=${view}]`).click();
+  const withInk=await sampleFrame(page);
+  await page.locator('#clear').click();const noInk=await sampleFrame(page);
+  let changed=0;for(let i=0;i<noInk.length;i+=4)if(Math.abs(noInk[i]-withInk[i])+Math.abs(noInk[i+1]-withInk[i+1])+Math.abs(noInk[i+2]-withInk[i+2])>35)changed++;
+  expect(changed,`visible ink on ${view}`).toBeGreaterThan(100);
+  await page.locator('#band-position').dispatchEvent('input');
+ }
+ await page.locator('[data-view=front]').click();await page.locator('.viewport').screenshot({path:'test-results/bracelet-front.png'});
+ await page.locator('[data-view=back]').click();await page.locator('.viewport').screenshot({path:'test-results/bracelet-back.png'});
+ await page.locator('#isolate').uncheck();await expect(page.locator('#canvas')).toHaveAttribute('data-isolated','false');await expect(page.locator('#canvas')).toHaveAttribute('data-tattoo-type','band');
+ await page.locator('#isolate').check();await page.locator('#auto-rotate').click();await expect(page.locator('#auto-rotate')).toHaveAttribute('aria-pressed','true');
+ await page.locator('#mode-move').click();await expect(page.locator('#auto-rotate')).toHaveAttribute('aria-pressed','false');
+ expect(errors).toEqual([]);
+});
+
+test('zone and wrap controls restore from the library',async({page})=>{
+ await openStudio(page);await page.locator('#demo-band').click();await expect(page.locator('#canvas')).toHaveAttribute('data-tattoo-type','band');
+ await page.locator('#zone').selectOption('forearm-right');
+ await page.locator('#band-position').fill('0.67');await page.locator('#band-position').dispatchEvent('input');
+ await page.locator('#band-repeat').fill('3');await page.locator('#band-repeat').dispatchEvent('input');
+ await page.locator('#size').fill('0.09');await page.locator('#size').dispatchEvent('input');
+ const saved=await savePlacement(page);expect(saved).toMatchObject({application:'band',bandPosition:.67,repeats:3,size:.09});
+ await page.reload();await expect(page.locator('#canvas')).toHaveAttribute('data-model-state','ready');await page.locator('.design-card').first().getByRole('button',{name:'Usar',exact:true}).click();
+ await expect(page.locator('#zone')).toHaveValue('forearm-right');await expect(page.locator('#canvas')).toHaveAttribute('data-tattoo-type','band');
+ await expect(page.locator('#band-position')).toHaveValue('0.67');await expect(page.locator('#band-repeat')).toHaveValue('3');await expect(page.locator('#size')).toHaveValue('0.09');
+ expect(await savePlacement(page)).toMatchObject({application:'band',bandPosition:.67,repeats:3,size:.09});
+});
+
+for(const sex of ['masculino','femenino']){
+ test(`all section choices work on the ${sex} model`,async({page})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));await openStudio(page);
+  await page.locator('#sex').selectOption(sex);await expect(page.locator('#canvas')).toHaveAttribute('data-model-state','ready');
+  for(const zone of ['arm-left','arm-right','forearm-left','forearm-right','upperarm-left','upperarm-right','calf-left','calf-right','chest','back','full']){
+   await page.locator('#zone').selectOption(zone);await expect(page.locator('#canvas')).toHaveAttribute('data-zone',zone);
+   const frame=await sampleFrame(page);expect(frame.some((value,i)=>i%4!==3&&value>80),`${sex} ${zone} renders skin`).toBe(true);
+  }
+  expect(errors).toEqual([]);
+ });
+}

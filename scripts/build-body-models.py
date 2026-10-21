@@ -35,7 +35,10 @@ for sex in ['male','female']:
   wt=target(f'universal-{sex}-young-averagemuscle-{weight}.target')
   shaped=[[v[j]+sum(t.get(i,[0,0,0])[j] for t in ethnic)/3+wt.get(i,[0,0,0])[j]*amount for j in range(3)] for i,v in enumerate(vertices)]
   used={i for face in groups['body'] for i in face};low=min(shaped[i][1] for i in used);scale=3/(max(shaped[i][1] for i in used)-low)
-  parent=len(model['nodes']);model['nodes'].append({'name':build,'children':[]});model['scenes'][0]['nodes'].append(parent)
+  joints={}
+  for name,group in [('shoulderLeft','joint-l-shoulder'),('elbowLeft','joint-l-elbow'),('wristLeft','joint-l-hand'),('kneeLeft','joint-l-knee'),('ankleLeft','joint-l-ankle'),('shoulderRight','joint-r-shoulder'),('elbowRight','joint-r-elbow'),('wristRight','joint-r-hand'),('kneeRight','joint-r-knee'),('ankleRight','joint-r-ankle')]:
+   ids={i for face in groups[group] for i in face};point=[sum(shaped[i][k] for i in ids)/len(ids) for k in range(3)];joints[name]=[point[0]*scale,(point[1]-low)*scale,point[2]*scale]
+  parent=len(model['nodes']);model['nodes'].append({'name':build,'children':[],'extras':{'joints':joints}});model['scenes'][0]['nodes'].append(parent)
   for part in ['body','helper-l-eye','helper-r-eye']:
    faces=groups[part];ids=sorted({i for face in faces for i in face});mapping={v:i for i,v in enumerate(ids)}
    pos=[[shaped[i][0]*scale,(shaped[i][1]-low)*scale,shaped[i][2]*scale] for i in ids]

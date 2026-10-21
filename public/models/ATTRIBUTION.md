@@ -12,4 +12,4 @@ Sources under `makehuman/data/`:
 
 Each source explicitly declares its CC0 release in its header. Original asset contributors include Manuel Bastioni, Data Collection AB, Joel Palmius and Jonas Hauquier. No MakeHuman application code is included.
 
-Conversion: scripts/build-body-models.py. Quad triangulation, normal generation, height normalization to 3 scene units; separate groups for three adult body builds and eye shells. Assets are bundled locally, without runtime requests to third-party model services. These are anatomical meshes rendered as clay, not photorealistic scanned skin.
+Conversion: scripts/build-body-models.py. Quad triangulation, normal generation, height normalization to 3 scene units; separate groups for three adult body builds and eye shells. Joint helper centroids are included as anatomical landmark metadata for section isolation and wrapping. Assets are bundled locally, without runtime requests to third-party model services. These are anatomical meshes rendered as clay, not photorealistic scanned skin.
