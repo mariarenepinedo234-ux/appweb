@@ -1,3 +1,4 @@
+import { installCategories, resolveCategory } from './categories.js';
 import express from 'express';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
@@ -56,13 +57,14 @@ async function saveImage(file){
  const filename=`${randomUUID()}.webp`;await writeFile(join(mediaDir,filename),buffer,{mode:0o600});return filename;
 }
 const removeMedia=filename=>unlink(join(mediaDir,filename)).catch(error=>{if(error.code!=='ENOENT')console.error('No se pudo limpiar un archivo multimedia:',error.code);});
-function galleryInput(body,old={}){const kind=body.kind??old.kind??'work';if(!['work','studio','artist'].includes(kind))fail('Tipo de publicación no válido.');return input(()=>({kind,title:text(body.title,'Título',120,1),description:text(body.description??'','Descripción',1000),category:text(body.category??'','Estilo',60),published:bool(body.published)?1:0,sort_order:Math.max(-10000,Math.min(10000,Number.parseInt(body.sort_order||'0',10)||0))}));}
+installCategories(app);
+function galleryInput(body,old={}){const kind=body.kind??old.kind??'work';if(!['work','studio','artist'].includes(kind))fail('Tipo de publicación no válido.');const item=input(()=>({kind,title:text(body.title,'Título',120,1),description:text(body.description??'','Descripción',1000),published:bool(body.published)?1:0,sort_order:Math.max(-10000,Math.min(10000,Number.parseInt(body.sort_order||'0',10)||0))}));const category=resolveCategory(body,old,kind);return {...item,category:category.name,category_id:category.id};}
 app.post('/api/admin/gallery',requireAdmin,imageUpload,wrap(async(req,res)=>{
  const item=galleryInput(req.body),id=randomUUID();let filename,designFilename;
  try{
   filename=await saveImage(req.files?.image?.[0]);
   if(req.files?.design?.[0]){if(item.kind!=='work')fail('El diseño del probador solo se adjunta a trabajos.');designFilename=await saveImage(req.files.design[0]);}
-  db.prepare('INSERT INTO gallery(id,title,description,category,filename,published,sort_order,kind,design_filename) VALUES(?,?,?,?,?,?,?,?,?)').run(id,item.title,item.description,item.category,filename,item.published,item.sort_order,item.kind,designFilename??null);
+  db.prepare('INSERT INTO gallery(id,title,description,category,filename,published,sort_order,kind,design_filename,category_id) VALUES(?,?,?,?,?,?,?,?,?,?)').run(id,item.title,item.description,item.category,filename,item.published,item.sort_order,item.kind,designFilename??null,item.category_id);
  }catch(error){if(filename)await removeMedia(filename);if(designFilename)await removeMedia(designFilename);throw error;}
  res.status(201).json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(id)));
 }));
@@ -72,7 +74,7 @@ app.put('/api/admin/gallery/:id',requireAdmin,imageUpload,wrap(async(req,res)=>{
   if(req.files?.image?.[0])filename=await saveImage(req.files.image[0]);
   if(req.files?.design?.[0]){if(item.kind!=='work')fail('El diseño del probador solo se adjunta a trabajos.');designFilename=await saveImage(req.files.design[0]);}
   else if(bool(req.body.removeDesign)||item.kind!=='work')designFilename=null;
-  db.prepare('UPDATE gallery SET title=?,description=?,category=?,published=?,sort_order=?,filename=?,kind=?,design_filename=? WHERE id=?').run(item.title,item.description,item.category,item.published,item.sort_order,filename,item.kind,designFilename,old.id);
+  db.prepare('UPDATE gallery SET title=?,description=?,category=?,published=?,sort_order=?,filename=?,kind=?,design_filename=?,category_id=? WHERE id=?').run(item.title,item.description,item.category,item.published,item.sort_order,filename,item.kind,designFilename,item.category_id,old.id);
  }catch(error){if(filename!==old.filename)await removeMedia(filename);if(designFilename&&designFilename!==old.design_filename)await removeMedia(designFilename);throw error;}
  if(filename!==old.filename)await removeMedia(old.filename);if(old.design_filename&&designFilename!==old.design_filename)await removeMedia(old.design_filename);
  res.json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(old.id)));

@@ -103,3 +103,11 @@ No necesitas registrar un número del estudio en el proyecto ni contratar una AP
 El número del cliente debe incluir `+` y código de país, por ejemplo `+591 70012345` (también se acepta `00591…`). No se adivina el país de números antiguos o locales: corrígelos en la reserva o en la vista previa. Cambiar el número únicamente en la vista previa no lo guarda en la reserva. El mensaje refleja el estado y horario guardados; los cambios pendientes deben guardarse antes de prepararlo. La vista previa es editable y no envía nada por sí sola.
 
 **Las notas internas nunca se copian al mensaje.** Las observaciones para el cliente se guardan en un campo diferente. El sistema no declara un aviso como enviado ni entregado, ya que un enlace manual no permite comprobarlo. El enlace contiene el número y el mensaje para WhatsApp; evita compartirlo con otras personas. La migración de SQLite añade el campo nuevo sin borrar reservas existentes.
+
+## Categorías, carrusel y teclado del chat
+
+En **Administración → Galería**, escribe una **Nueva categoría** y pulsa **Crear categoría**. Después elige la **Categoría del tatuaje** al subir o editar cada trabajo. Puedes renombrar categorías (el nombre cambia en todas sus fotos) o eliminarlas con confirmación: las imágenes permanecen como **Sin categoría**. Los nombres repetidos se rechazan, incluso con diferencias de mayúsculas o acentos. Las fotos del estudio y de artistas mantienen su sección independiente.
+
+Las categorías que antes escribías como texto se convierten automáticamente en categorías administrables al iniciar, conservando las fotos. La galería pública muestra solo categorías con trabajos publicados, permite filtrar y recorrer las imágenes con flechas o deslizando en celular. Al abrir una imagen se puede pasar a la anterior o siguiente sin cerrar la vista; las flechas del teclado también funcionan. Se conserva **Probar un diseño similar** cuando el trabajo tiene un dibujo adjunto. El carrusel no avanza solo y respeta la preferencia de reducir movimiento.
+
+En el chat, **Enter envía la consulta** y **Shift+Enter añade una línea**. El botón Enviar sigue disponible. No se envían consultas vacías, teclas repetidas ni pulsaciones Enter durante la composición del teclado.

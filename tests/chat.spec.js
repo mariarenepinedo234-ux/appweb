@@ -37,8 +37,8 @@ test('chat requires admin configuration and safely handles simulated provider er
 test('visitor chat works with simulated AI, preserves turns and clears the conversation',async({page,request})=>{
  await login(request);await request.put('/api/admin/chat',{headers,data:settings});
  await page.goto('/');await page.getByRole('button',{name:'Pregúntale a la IA'}).click();await expect(page.locator('#chat-title')).toHaveText('Asistente de prueba');
- await page.getByLabel('Tu pregunta sobre tatuajes').fill('¿Cómo preparo mi piel?');await page.locator('#chat-send').click();await expect(page.locator('#chat-log')).toContainText('evita acudir con la zona irritada');
- await page.getByLabel('Tu pregunta sobre tatuajes').fill('¿Y el precio?');await page.locator('#chat-send').click();await expect(page.locator('#chat-log')).toContainText('No tengo una tarifa publicada');
+ await page.getByLabel('Tu pregunta sobre tatuajes').fill('¿Cómo preparo mi piel?');await page.getByLabel('Tu pregunta sobre tatuajes').dispatchEvent('keydown',{key:'Enter',isComposing:true});await expect(page.locator('#chat-log .chat-user')).toHaveCount(0);await page.getByLabel('Tu pregunta sobre tatuajes').press('Enter');await expect(page.locator('#chat-log')).toContainText('evita acudir con la zona irritada');
+ await page.getByLabel('Tu pregunta sobre tatuajes').fill('¿Y el precio?');await page.getByLabel('Tu pregunta sobre tatuajes').press('Shift+Enter');await expect(page.getByLabel('Tu pregunta sobre tatuajes')).toHaveValue('¿Y el precio?\n');await page.locator('#chat-send').click();await expect(page.locator('#chat-log')).toContainText('No tengo una tarifa publicada');
  await page.locator('#chat-clear').click();await expect(page.locator('#chat-log .chat-bubble')).toHaveCount(1);
  await page.setViewportSize({width:390,height:844});await page.locator('#chat-panel').screenshot({path:'test-results/chat-mobile.png'});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.getByRole('button',{name:'Cerrar chat'}).click();await expect(page.locator('#chat-panel')).toBeHidden();

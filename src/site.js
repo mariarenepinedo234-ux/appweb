@@ -1,4 +1,5 @@
-import { initDiscovery, renderStudioPhotos, tryDesign } from './discovery.js';
+import { renderGallery } from './gallery.js';
+import { initDiscovery, renderStudioPhotos } from './discovery.js';
 import { api, notify } from './api.js';
 import { initChat } from './chat.js';
 import './site.css';
@@ -42,13 +43,4 @@ function applySettings(settings){
  document.querySelector('footer>span').textContent=settings.footerText;$('booking-notice').textContent=settings.bookingNotice;$('booking-timezone').textContent=`Horario del estudio: ${settings.timezone}. Cada consulta dura ${settings.slotMinutes} minutos.`;
  const container=$('contact-details');
  for(const [value,href] of [[settings.contactEmail,settings.contactEmail?`mailto:${settings.contactEmail}`:''],[settings.contactPhone,settings.contactPhone?`tel:${settings.contactPhone.replace(/[^+\d]/g,'')}`:''],[settings.address,''],[settings.instagram,settings.instagram]]){if(!value)continue;const node=document.createElement(href?'a':'p');node.textContent=value;if(href)node.href=href;if(href.startsWith('https:')){node.target='_blank';node.rel='noopener noreferrer';}container.append(node);}
-}
-function renderGallery(rows){
- const dialog=$('gallery-dialog');$('gallery-close').onclick=()=>dialog.close();dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
- if(!rows.length){notify($('gallery-message'),'El estudio está preparando su galería. Pronto podrás explorar sus trabajos.');return;}
- const categories=['Todos',...new Set(rows.map(x=>x.category).filter(Boolean))];
- function show(category){$('gallery-grid').replaceChildren();document.querySelectorAll('.gallery-filters button').forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===category)));
-  rows.filter(row=>category==='Todos'||row.category===category).forEach(row=>{const card=document.createElement('article');card.className='gallery-card';const button=document.createElement('button');button.type='button';button.setAttribute('aria-label',`Ver ${row.title}`);const image=document.createElement('img');image.src=row.url;image.alt=row.title;image.loading='lazy';button.append(image);const title=document.createElement('h3');title.textContent=row.title;const caption=document.createElement('p');caption.textContent=row.category;button.onclick=()=>{$('gallery-large').src=row.url;$('gallery-large').alt=row.title;$('gallery-caption').textContent=row.title;$('gallery-description').textContent=row.description;dialog.showModal();};card.append(button,title,caption);if(row.designUrl){const tryButton=document.createElement('button');tryButton.type='button';tryButton.className='gallery-try';tryButton.textContent='Probar un diseño similar ↗';tryButton.setAttribute('aria-label',`Probar diseño de ${row.title}`);tryButton.onclick=()=>tryDesign(row.designUrl,row.title);card.append(tryButton);}$('gallery-grid').append(card);});
- }
- for(const category of categories){const button=document.createElement('button');button.textContent=category;button.onclick=()=>show(category);$('gallery-filters').append(button);}show('Todos');
 }

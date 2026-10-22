@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { categoryKey } from './category-name.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -10,6 +12,7 @@ db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=50
 CREATE TABLE IF NOT EXISTS admins(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,admin_id TEXT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS settings(id INTEGER PRIMARY KEY CHECK(id=1),content TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS gallery_categories(id TEXT PRIMARY KEY,name TEXT NOT NULL,name_key TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS gallery(id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',category TEXT NOT NULL DEFAULT '',filename TEXT NOT NULL UNIQUE,published INTEGER NOT NULL DEFAULT 0,sort_order INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS bookings(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,phone TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,zone TEXT NOT NULL,idea TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','cancelled','completed')),admin_note TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_active_slot ON bookings(day,time) WHERE status IN ('pending','confirmed');
@@ -21,7 +24,14 @@ if(!galleryColumns.has('kind'))db.exec("ALTER TABLE gallery ADD COLUMN kind TEXT
 if(!galleryColumns.has('design_filename'))db.exec('ALTER TABLE gallery ADD COLUMN design_filename TEXT');
 const bookingColumns=new Set(db.prepare('PRAGMA table_info(bookings)').all().map(column=>column.name));
 if(!bookingColumns.has('client_note'))db.exec("ALTER TABLE bookings ADD COLUMN client_note TEXT NOT NULL DEFAULT ''");
-db.exec('PRAGMA user_version=3');
+if(!galleryColumns.has('category_id'))db.exec('ALTER TABLE gallery ADD COLUMN category_id TEXT REFERENCES gallery_categories(id) ON DELETE SET NULL');
+// Import existing free-text labels once, keeping photos attached to their category.
+for(const row of db.prepare("SELECT id,category FROM gallery WHERE category_id IS NULL AND trim(category)<>'' AND kind='work'").all()){
+ const name=row.category.trim().replace(/\s+/g,' '),key=categoryKey(name);let category=db.prepare('SELECT id,name FROM gallery_categories WHERE name_key=?').get(key);
+ if(!category){category={id:randomUUID(),name};db.prepare('INSERT INTO gallery_categories(id,name,name_key) VALUES(?,?,?)').run(category.id,name,key);}
+ db.prepare('UPDATE gallery SET category_id=?,category=? WHERE id=?').run(category.id,category.name,row.id);
+}
+db.exec('PRAGMA user_version=4');
 export const defaults={
  brandName:'INKFORMA',tagline:'TATTOO STUDIO',heroLine1:'Tu piel.',heroLine2:'Tu historia.',heroAccent:'Tu próxima tinta.',heroIntro:'Un espacio para imaginar lo que llevarás contigo. Explora tu próximo tatuaje antes de dar el paso.',
  aboutTitle:'Arte con identidad.',aboutText:'Cada tatuaje empieza con una conversación. Creamos piezas que conectan con tu historia, cuidando el diseño, la técnica y cada detalle de tu experiencia.',
