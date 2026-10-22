@@ -83,3 +83,15 @@ Consulta [server/README.md](server/README.md) para crear la primera cuenta, edit
 ## Chat de tatuajes con IA
 
 Incluye un chat público especializado en tatuajes y configuración en **Administración → Asistente IA**. Para conectar una clave propia de Gemini desde Google AI Studio, usa `npm.cmd run ai:configure`; después activa el bot desde el panel. Usa un proyecto sin facturación activada y con cuota gratuita disponible; los límites dependen de Google, del modelo y de tu cuenta. La clave se guarda en el servidor, nunca en el navegador ni en Git. Sin clave, el chat muestra que no está disponible. Consulta [la guía de IA](server/README.md#asistente-de-tatuajes-con-ia) para configuración, límites y privacidad.
+
+## Portada interactiva y diseños de prueba
+
+La portada incluye una vista anatómica 3D con tatuaje botánico y control de giro. En pantallas pequeñas o con movimiento reducido se muestra una captura ligera: el visitante decide cuándo cargar la segunda vista 3D. Las vistas dejan de dibujar cuando no están visibles. El probador principal conserva sus controles y biblioteca local.
+
+La sección **¿Qué habla de ti?** presenta cuatro estilos con dibujos de muestra originales: Botánica, Geométrico, Minimalista y Lettering. Al pulsar **Probar este diseño**, se coloca sobre el antebrazo del modelo incluido; se puede mover, girar y guardar como un diseño subido. Estas muestras no representan trabajos reales del estudio.
+
+En **Administración → Galería**, cada publicación puede ser **Trabajo de tatuaje**, **Foto del estudio** o **Artista del estudio**. Publica fotografías reales con su título y descripción para mostrar el espacio y el equipo; la sección se oculta mientras no haya fotos publicadas. El administrador debe contar con los derechos y permisos de las personas fotografiadas.
+
+Los trabajos pueden llevar un **Diseño para el probador** opcional, separado de la foto del tatuaje terminado. Sube el dibujo limpio en PNG transparente, JPG o WEBP (máx. 10 MB por archivo). Solo esos trabajos muestran el botón **Probar un diseño similar**. Se pueden reemplazar o quitar los dibujos desde el panel; los borradores y sus archivos siguen protegidos. Las fotos se optimizan, conservando transparencia y eliminando metadatos.
+
+La actualización añade columnas a SQLite automáticamente al iniciar, sin borrar registros ni archivos. Conserva la carpeta `data` al actualizar; haz una copia con el servidor detenido. El póster de portada se obtuvo de los modelos MakeHuman CC0 incluidos; consulta `public/models/ATTRIBUTION.md`.

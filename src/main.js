@@ -21,7 +21,7 @@ document.querySelector('#app').innerHTML = `
 
 let library=[];
 try { library=JSON.parse(localStorage.getItem('inkforma-library') || '[]'); if(!Array.isArray(library)) library=[]; } catch { library=[]; }
-let renderer;
+let renderer,needsRender=true;
 try { renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,alpha:true}); } catch { $('status').textContent='Este navegador no permite WebGL. Puedes subir y guardar diseños en la biblioteca.'; }
 const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x192122,6,14);
 const camera=new THREE.PerspectiveCamera(36,1,0.1,100); camera.position.set(0,1.55,6.1);
@@ -65,8 +65,8 @@ const floor=new THREE.Mesh(new THREE.CylinderGeometry(1.08,1.12,.06,96),new THRE
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x192122,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.09;ground.receiveShadow=true;scene.add(ground);
 const grid=new THREE.GridHelper(10,40,0x61716c,0x3a4845);grid.position.y=-.085;grid.material.transparent=true;grid.material.opacity=.25;scene.add(grid);
 let texture=null,source=null,decal=null,placement=null,flipped=false;
-function clearDecal(){if(decal){scene.remove(decal);decal.geometry.dispose();decal.material.dispose();decal=null;}placement=null;delete $('canvas').dataset.tattooType;}
-function drawDecal(){
+function clearDecal(){needsRender=true;if(decal){scene.remove(decal);decal.geometry.dispose();decal.material.dispose();decal=null;}placement=null;delete $('canvas').dataset.tattooType;}
+function drawDecal(){needsRender=true;
  if(!placement || !texture)return;
  if(decal){scene.remove(decal);decal.geometry.dispose();decal.material.dispose();}
  if($('application').value==='band' && zoneFrame){
@@ -87,10 +87,10 @@ function drawDecal(){
  decal=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:texture,transparent:true,opacity:Number($('opacity').value),roughness:.7,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4}));decal.renderOrder=2;scene.add(decal);
 }
 function processImage(){if(!source)return;const c=document.createElement('canvas');const scale=Math.min(1,1536/Math.max(source.width,source.height));c.width=Math.round(source.width*scale);c.height=Math.round(source.height*scale);const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(source,0,0,c.width,c.height);if($('remove').checked){const img=ctx.getImageData(0,0,c.width,c.height);const t=Number($('threshold').value);for(let i=0;i<img.data.length;i+=4){const v=Math.min(img.data[i],img.data[i+1],img.data[i+2]);img.data[i+3]*=1-Math.max(0,Math.min(1,(v-t)/18));}ctx.putImageData(img,0,0);}if(texture)texture.dispose();texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;$('design-preview').replaceChildren(c.cloneNode());$('design-preview').firstChild.getContext('2d').drawImage(c,0,0);$('save').disabled=false;if($('application').value==='band')ensureBandPlacement();drawDecal();setMode('move');$('status').textContent=$('application').value==='band'?'Brazalete aplicado alrededor de la extremidad. Gírala para revisar la unión y los laterales.':'Arrastra sobre la piel para colocar y mover tu tatuaje.';}
-function loadImage(url,saved=null,inspect=false){const img=new Image();img.onload=()=>{source=img;processImage();if(saved && surfaces[0]){$('application').value=saved.application || 'decal';$('band-position').value=saved.bandPosition ?? .5;$('band-repeat').value=saved.repeats ?? 1;updateApplicationUI();placement={mesh:surfaces[0],point:new THREE.Vector3(...saved.point),normal:new THREE.Vector3(...saved.normal).normalize()};$('size').value=saved.size;$('rotation').value=saved.rotation;$('opacity').value=saved.opacity ?? .9;flipped=!!saved.flipped;drawDecal();}if(inspect)setMode('orbit');};img.onerror=()=>{$('status').textContent='No se pudo leer la imagen.';};img.src=url;}
+function loadImage(url,saved=null,inspect=false,onReady=null){const img=new Image();img.onload=()=>{source=img;processImage();if(saved && surfaces[0]){$('application').value=saved.application || 'decal';$('band-position').value=saved.bandPosition ?? .5;$('band-repeat').value=saved.repeats ?? 1;updateApplicationUI();placement={mesh:surfaces[0],point:new THREE.Vector3(...saved.point),normal:new THREE.Vector3(...saved.normal).normalize()};$('size').value=saved.size;$('rotation').value=saved.rotation;$('opacity').value=saved.opacity ?? .9;flipped=!!saved.flipped;drawDecal();}if(inspect)setMode('orbit');onReady?.();};img.onerror=()=>{$('status').textContent='No se pudo leer la imagen.';};img.src=url;}
 $('upload').onchange=()=>{const file=$('upload').files[0];if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){$('status').textContent='Usa un PNG, JPG o WEBP de hasta 10 MB.';return;}const reader=new FileReader();reader.onload=()=>loadImage(reader.result);reader.readAsDataURL(file);};
 $('remove').onchange=processImage;$('threshold').oninput=processImage;$('size').oninput=drawDecal;$('rotation').oninput=drawDecal;$('opacity').oninput=drawDecal;$('flip').onclick=()=>{flipped=!flipped;drawDecal();};$('clear').onclick=()=>{clearDecal();$('status').textContent='Tatuaje retirado. Tu diseño sigue disponible para colocarlo otra vez.';};
-$('skin').oninput=()=>skin.color.set($('skin').value);$('sex').onchange=makeBody;$('build').onchange=makeBody;
+$('skin').oninput=()=>{skin.color.set($('skin').value);needsRender=true;};$('sex').onchange=makeBody;$('build').onchange=makeBody;
 const ray=new THREE.Raycaster();let mode='orbit',dragPointer=null;
 function setMode(next){mode=next;if(controls&&mode==='move'){controls.autoRotate=false;$('auto-rotate').setAttribute('aria-pressed','false');}if(controls)controls.enabled=mode==='orbit';$('mode-orbit').setAttribute('aria-pressed',String(mode==='orbit'));$('mode-move').setAttribute('aria-pressed',String(mode==='move'));$('canvas').dataset.mode=mode;}
 $('mode-orbit').onclick=()=>{setMode('orbit');$('status').textContent='Arrastra para girar el cuerpo. Usa la rueda o dos dedos para acercarte.';};
@@ -137,7 +137,7 @@ function refreshVisibility(){
  floor.visible=ground.visible=grid.visible=!isolated;
  $('canvas').dataset.isolated=String(isolated);
 }
-function applyZone(){
+function applyZone(){needsRender=true;
  if(!fullSurface)return;clearDecal();if(zoneMesh){body.remove(zoneMesh);zoneMesh.geometry.dispose();zoneMesh=null;}zoneFrame=null;
  const id=$('zone').value,zone=resolveZone(id,activeModel.userData.joints);
  if(id==='full'){surfaces=[fullSurface];}else{
@@ -178,7 +178,22 @@ function download(url,name){const a=document.createElement('a');a.href=url;a.dow
 function persist(next){try{localStorage.setItem('inkforma-library',JSON.stringify(next));library=next;renderLibrary();return true;}catch{$('status').textContent='No hay espacio local disponible. Descarga tu diseño antes de continuar.';return false;}}
 $('save').onclick=()=>{if(!texture)return;const next=[{id:crypto.randomUUID(),image:texture.image.toDataURL('image/png'),date:new Date().toLocaleDateString('es'),sex:$('sex').value,build:$('build').value,skin:$('skin').value,customModelId:selectedCustomModel?.id||null,zone:$('zone').value,isolate:$('isolate').checked,placement:placement?{point:placement.point.toArray(),normal:placement.normal.toArray(),size:Number($('size').value),rotation:Number($('rotation').value),opacity:Number($('opacity').value),flipped,application:$('application').value,bandPosition:Number($('band-position').value),repeats:Number($('band-repeat').value)}:null},...library];if(persist(next))$('status').textContent='Diseño guardado en la biblioteca de este navegador.';};
 function renderLibrary(){$('count').textContent=`${library.length} DISEÑOS`;$('library').replaceChildren();if(!library.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Tu próxima idea tiene un lugar aquí. Sube un diseño y guárdalo para empezar.';$('library').append(empty);}library.forEach((item,i)=>{const card=document.createElement('article');card.className='design-card';const img=document.createElement('img');img.src=item.image;img.alt=`Diseño de tatuaje ${i+1}`;const caption=document.createElement('p');caption.textContent=`Diseño ${library.length-i} · ${item.date}`;const actions=document.createElement('div');for(const [label,action] of [['Usar',async()=>{if(item.skin){if(item.customModelId&&!customCatalog.has(item.customModelId)){$('status').textContent='El modelo guardado ya no está publicado o no se pudo cargar. El diseño sigue disponible para descargar.';return;}chooseCustomModel(item.customModelId?customCatalog.get(item.customModelId):null);$('skin').value=item.skin;skin.color.set(item.skin);$('sex').value=item.sex;$('build').value=item.build;$('zone').value=zones[item.zone]?item.zone:'full';$('isolate').checked=item.isolate ?? true;await makeBody();}$('remove').checked=false;loadImage(item.image,item.placement);$('experiencia').scrollIntoView({behavior:'smooth'});}],['Descargar',()=>download(item.image,'inkforma-tatuaje.png')],['Eliminar',()=>persist(library.filter(x=>x.id!==item.id))]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;actions.append(b);}card.append(img,caption,actions);$('library').append(card);});}
+let designRequest=0;
+window.addEventListener('inkforma:try-design',async event=>{
+ const request=++designRequest,{url,title}=event.detail;
+ // Only packaged examples or same-origin, server-validated gallery media.
+ if(!/^\/(designs\/[a-z]+\.svg|media\/[0-9a-f-]{36}\.webp)$/.test(url))return;
+ $('experiencia').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+ chooseCustomModel(null);$('zone').value='forearm-left';$('isolate').checked=true;$('application').value='decal';$('size').value=.20;$('rotation').value=0;$('opacity').value=.9;$('remove').checked=false;flipped=false;
+ await makeBody();if(request!==designRequest||$('canvas').dataset.modelState!=='ready')return;
+ loadImage(url,null,false,()=>{
+  if(request!==designRequest)return;
+  setView('front');camera.updateMatrixWorld(true);
+  const rect=renderer?.domElement.getBoundingClientRect();const placed=rect&&placeAt({clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+  $('status').textContent=placed?`${title}: ya está sobre la piel. Arrastra para moverlo o elige Girar cuerpo para verlo desde otro ángulo.`:`${title}: diseño cargado. Toca la piel para colocarlo.`;
+ });
+});
 makeBody();renderLibrary();initSite();
-if(renderer){const observer=new ResizeObserver(()=>{const w=$('canvas').clientWidth,h=$('canvas').clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();});observer.observe($('canvas'));renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});}
+if(renderer){const observer=new ResizeObserver(()=>{const w=$('canvas').clientWidth,h=$('canvas').clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();});observer.observe($('canvas'));controls.addEventListener('change',()=>{needsRender=true;});let visible=true;new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;}).observe($('canvas'));renderer.setAnimationLoop(()=>{if((!visible&&!needsRender)||document.hidden)return;controls.update();renderer.render(scene,camera);needsRender=false;});}
 
 }

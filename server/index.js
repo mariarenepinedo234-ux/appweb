@@ -41,13 +41,13 @@ app.post('/api/admin/password',requireAdmin,wrap(async(req,res)=>{
 }));
 app.put('/api/admin/site',requireAdmin,wrap(async(req,res)=>{const settings=input(()=>validateSettings(req.body,getSettings()));db.prepare('UPDATE settings SET content=? WHERE id=1').run(JSON.stringify(settings));res.json(settings);}));
 
-function galleryRow(row){return {...row,published:!!row.published,url:`/media/${row.filename}`};}
+function galleryRow(row){return {...row,published:!!row.published,url:`/media/${row.filename}`,designUrl:row.design_filename?`/media/${row.design_filename}`:null};}
 function modelRow(row){return {...row,published:!!row.published,url:`/media/${row.filename}`};}
 app.get('/api/gallery',(req,res)=>res.json(db.prepare('SELECT * FROM gallery WHERE published=1 ORDER BY sort_order,created_at DESC').all().map(galleryRow)));
 app.get('/api/models',(req,res)=>res.json(db.prepare('SELECT * FROM body_models WHERE published=1 ORDER BY created_at DESC').all().map(modelRow)));
 app.get('/api/admin/gallery',requireAdmin,(req,res)=>res.json(db.prepare('SELECT * FROM gallery ORDER BY sort_order,created_at DESC').all().map(galleryRow)));
 app.get('/api/admin/models',requireAdmin,(req,res)=>res.json(db.prepare('SELECT * FROM body_models ORDER BY created_at DESC').all().map(modelRow)));
-const imageUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:1,fields:8}}).single('image');
+const imageUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:10*1024*1024,files:2,fields:12}}).fields([{name:'image',maxCount:1},{name:'design',maxCount:1}]);
 const modelUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:30*1024*1024,files:1,fields:4}}).single('model');
 async function saveImage(file){
  if(!file)fail('Selecciona una imagen PNG, JPG o WEBP.');
@@ -56,16 +56,28 @@ async function saveImage(file){
  const filename=`${randomUUID()}.webp`;await writeFile(join(mediaDir,filename),buffer,{mode:0o600});return filename;
 }
 const removeMedia=filename=>unlink(join(mediaDir,filename)).catch(error=>{if(error.code!=='ENOENT')console.error('No se pudo limpiar un archivo multimedia:',error.code);});
-function galleryInput(body){return input(()=>({title:text(body.title,'Título',120,1),description:text(body.description??'','Descripción',1000),category:text(body.category??'','Estilo',60),published:bool(body.published)?1:0,sort_order:Math.max(-10000,Math.min(10000,Number.parseInt(body.sort_order||'0',10)||0))}));}
+function galleryInput(body,old={}){const kind=body.kind??old.kind??'work';if(!['work','studio','artist'].includes(kind))fail('Tipo de publicación no válido.');return input(()=>({kind,title:text(body.title,'Título',120,1),description:text(body.description??'','Descripción',1000),category:text(body.category??'','Estilo',60),published:bool(body.published)?1:0,sort_order:Math.max(-10000,Math.min(10000,Number.parseInt(body.sort_order||'0',10)||0))}));}
 app.post('/api/admin/gallery',requireAdmin,imageUpload,wrap(async(req,res)=>{
- const item=galleryInput(req.body),filename=await saveImage(req.file),id=randomUUID();try{db.prepare('INSERT INTO gallery(id,title,description,category,filename,published,sort_order) VALUES(?,?,?,?,?,?,?)').run(id,item.title,item.description,item.category,filename,item.published,item.sort_order);}catch(error){await removeMedia(filename);throw error;}res.status(201).json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(id)));
+ const item=galleryInput(req.body),id=randomUUID();let filename,designFilename;
+ try{
+  filename=await saveImage(req.files?.image?.[0]);
+  if(req.files?.design?.[0]){if(item.kind!=='work')fail('El diseño del probador solo se adjunta a trabajos.');designFilename=await saveImage(req.files.design[0]);}
+  db.prepare('INSERT INTO gallery(id,title,description,category,filename,published,sort_order,kind,design_filename) VALUES(?,?,?,?,?,?,?,?,?)').run(id,item.title,item.description,item.category,filename,item.published,item.sort_order,item.kind,designFilename??null);
+ }catch(error){if(filename)await removeMedia(filename);if(designFilename)await removeMedia(designFilename);throw error;}
+ res.status(201).json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(id)));
 }));
 app.put('/api/admin/gallery/:id',requireAdmin,imageUpload,wrap(async(req,res)=>{
- const old=db.prepare('SELECT * FROM gallery WHERE id=?').get(req.params.id);if(!old)fail('La imagen no existe.',404);const item=galleryInput(req.body),filename=req.file?await saveImage(req.file):old.filename;
- try{db.prepare('UPDATE gallery SET title=?,description=?,category=?,published=?,sort_order=?,filename=? WHERE id=?').run(item.title,item.description,item.category,item.published,item.sort_order,filename,old.id);}catch(error){if(filename!==old.filename)await removeMedia(filename);throw error;}
- if(filename!==old.filename)await removeMedia(old.filename);res.json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(old.id)));
+ const old=db.prepare('SELECT * FROM gallery WHERE id=?').get(req.params.id);if(!old)fail('La imagen no existe.',404);const item=galleryInput(req.body,old);let filename=old.filename,designFilename=old.design_filename;
+ try{
+  if(req.files?.image?.[0])filename=await saveImage(req.files.image[0]);
+  if(req.files?.design?.[0]){if(item.kind!=='work')fail('El diseño del probador solo se adjunta a trabajos.');designFilename=await saveImage(req.files.design[0]);}
+  else if(bool(req.body.removeDesign)||item.kind!=='work')designFilename=null;
+  db.prepare('UPDATE gallery SET title=?,description=?,category=?,published=?,sort_order=?,filename=?,kind=?,design_filename=? WHERE id=?').run(item.title,item.description,item.category,item.published,item.sort_order,filename,item.kind,designFilename,old.id);
+ }catch(error){if(filename!==old.filename)await removeMedia(filename);if(designFilename&&designFilename!==old.design_filename)await removeMedia(designFilename);throw error;}
+ if(filename!==old.filename)await removeMedia(old.filename);if(old.design_filename&&designFilename!==old.design_filename)await removeMedia(old.design_filename);
+ res.json(galleryRow(db.prepare('SELECT * FROM gallery WHERE id=?').get(old.id)));
 }));
-app.delete('/api/admin/gallery/:id',requireAdmin,wrap(async(req,res)=>{const row=db.prepare('SELECT filename FROM gallery WHERE id=?').get(req.params.id);if(!row)fail('La imagen no existe.',404);db.prepare('DELETE FROM gallery WHERE id=?').run(req.params.id);await removeMedia(row.filename);res.json({ok:true});}));
+app.delete('/api/admin/gallery/:id',requireAdmin,wrap(async(req,res)=>{const row=db.prepare('SELECT filename,design_filename FROM gallery WHERE id=?').get(req.params.id);if(!row)fail('La imagen no existe.',404);db.prepare('DELETE FROM gallery WHERE id=?').run(req.params.id);await removeMedia(row.filename);if(row.design_filename)await removeMedia(row.design_filename);res.json({ok:true});}));
 app.post('/api/admin/models',requireAdmin,modelUpload,wrap(async(req,res)=>{
  const title=input(()=>text(req.body.title,'Nombre del modelo',100,1));if(!req.file)fail('Selecciona un archivo GLB.');input(()=>validateGlb(req.file.buffer));const id=randomUUID(),filename=`${id}.glb`;await writeFile(join(mediaDir,filename),req.file.buffer,{mode:0o600});
  try{db.prepare('INSERT INTO body_models(id,title,filename,published) VALUES(?,?,?,0)').run(id,title,filename);}catch(error){await removeMedia(filename);throw error;}
@@ -75,7 +87,7 @@ app.put('/api/admin/models/:id',requireAdmin,wrap(async(req,res)=>{const row=db.
 app.delete('/api/admin/models/:id',requireAdmin,wrap(async(req,res)=>{const row=db.prepare('SELECT filename FROM body_models WHERE id=?').get(req.params.id);if(!row)fail('El modelo no existe.',404);db.prepare('DELETE FROM body_models WHERE id=?').run(req.params.id);await removeMedia(row.filename);res.json({ok:true});}));
 app.get('/media/:filename',wrap(async(req,res)=>{
  const filename=req.params.filename;if(!/^[0-9a-f-]{36}\.(webp|glb)$/.test(filename))return res.sendStatus(404);
- const row=db.prepare(filename.endsWith('.glb')?'SELECT published FROM body_models WHERE filename=?':'SELECT published FROM gallery WHERE filename=?').get(filename);
+ const row=db.prepare(filename.endsWith('.glb')?'SELECT published FROM body_models WHERE filename=?':'SELECT published FROM gallery WHERE filename=? OR design_filename=?').get(...(filename.endsWith('.glb')?[filename]:[filename,filename]));
  if(!row||(!row.published&&!sessionFrom(req)))return res.sendStatus(404);
  res.setHeader('Cache-Control',row.published?'public, max-age=300':'private, no-store');if(filename.endsWith('.glb'))res.type('model/gltf-binary');res.sendFile(join(mediaDir,filename));
 }));

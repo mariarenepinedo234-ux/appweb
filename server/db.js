@@ -14,7 +14,12 @@ CREATE TABLE IF NOT EXISTS gallery(id TEXT PRIMARY KEY,title TEXT NOT NULL,descr
 CREATE TABLE IF NOT EXISTS bookings(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,phone TEXT NOT NULL,day TEXT NOT NULL,time TEXT NOT NULL,zone TEXT NOT NULL,idea TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','confirmed','cancelled','completed')),admin_note TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_active_slot ON bookings(day,time) WHERE status IN ('pending','confirmed');
 CREATE TABLE IF NOT EXISTS body_models(id TEXT PRIMARY KEY,title TEXT NOT NULL,filename TEXT NOT NULL UNIQUE,published INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-PRAGMA user_version=1;`);
+`);
+// Additive migration: existing photos, reservations and accounts remain intact.
+const galleryColumns=new Set(db.prepare('PRAGMA table_info(gallery)').all().map(column=>column.name));
+if(!galleryColumns.has('kind'))db.exec("ALTER TABLE gallery ADD COLUMN kind TEXT NOT NULL DEFAULT 'work'");
+if(!galleryColumns.has('design_filename'))db.exec('ALTER TABLE gallery ADD COLUMN design_filename TEXT');
+db.exec('PRAGMA user_version=2');
 export const defaults={
  brandName:'INKFORMA',tagline:'TATTOO STUDIO',heroLine1:'Tu piel.',heroLine2:'Tu historia.',heroAccent:'Tu próxima tinta.',heroIntro:'Un espacio para imaginar lo que llevarás contigo. Explora tu próximo tatuaje antes de dar el paso.',
  aboutTitle:'Arte con identidad.',aboutText:'Cada tatuaje empieza con una conversación. Creamos piezas que conectan con tu historia, cuidando el diseño, la técnica y cada detalle de tu experiencia.',
