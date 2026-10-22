@@ -60,13 +60,14 @@ test('direct generation diagnostic reports the effective model and HTTP error wi
  for(const status of [200,404]){
   const directory=mkdtempSync(join(tmpdir(),'inkforma-test-diagnostic-'));
   try{
-   const fixture=status===200?{candidates:[{content:{parts:[{text:'conexión correcta'}]}}]}:{error:{status:'NOT_FOUND',message:'PRIVATE_PROVIDER_DETAIL'}};
+   const fixture=status===200?{candidates:[{content:{parts:[{text:'conexión correcta'}]}}]}:{error:{status:'NOT_FOUND',message:'Model gemini-test is not found for generateContent; fake-private-test-key projects/private-project user@example.test'}};
    const code=`process.argv.push('--generate');globalThis.fetch=async(url,options)=>{if(!url.endsWith('/gemini-test:generateContent')||JSON.parse(options.body).contents[0].role!=='user')throw Error('wrong request');return new Response(JSON.stringify(${JSON.stringify(fixture)}),{status:${status}});};await import('./scripts/check-ai.mjs');`;
    const result=spawnSync(process.execPath,['--input-type=module','-e',code],{cwd:process.cwd(),env:{...process.env,APP_DATA_DIR:directory,INKFORMA_GEMINI_KEY:'fake-private-test-key',INKFORMA_GEMINI_MODEL:'gemini-test'},encoding:'utf8'});
    expect(result.status).toBe(status===200?0:1);
    const output=result.stdout+result.stderr;
    expect(output).toContain(`HTTP ${status}`);expect(output).toContain('gemini-test');
-   expect(output).not.toContain('PRIVATE_PROVIDER_DETAIL');expect(output).not.toContain('fake-private-test-key');
+   expect(output).not.toContain('fake-private-test-key');expect(output).not.toContain('private-project');expect(output).not.toContain('user@example.test');
+   if(status===404)expect(output).toContain('Model gemini-test is not found for generateContent');
   }finally{rmSync(directory,{recursive:true,force:true});}
  }
 });

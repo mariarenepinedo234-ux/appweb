@@ -13,7 +13,19 @@ try{
   console.log(`Generación directa: HTTP ${response.status}. Modelo usado: ${model}`);
   const status=data.error?.status;
   if(['INVALID_ARGUMENT','UNAUTHENTICATED','PERMISSION_DENIED','NOT_FOUND','RESOURCE_EXHAUSTED','INTERNAL','UNAVAILABLE','FAILED_PRECONDITION'].includes(status))console.log(`Estado de Google: ${status}`);
-  if(!response.ok)throw Error(geminiError(response.status,data));
+  if(!response.ok){
+   // Terminal-only diagnostic: never print raw error objects, headers or credentials.
+   if(typeof data.error?.message==='string'){
+    const detail=data.error.message.split(key).join('[CLAVE OCULTA]')
+     .replace(/AIza[\w-]+/g,'[CLAVE OCULTA]')
+     .replace(/((?:key|token|authorization)\s*[=:]\s*)[^\s&"']+/gi,'$1[OCULTO]')
+     .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi,'[CORREO OCULTO]')
+     .replace(/projects\/[a-zA-Z0-9_-]+/g,'projects/[OCULTO]')
+     .replace(/[\x00-\x1f\x7f-\x9f]/g,' ').slice(0,1200);
+    console.log(`Motivo de Google (credenciales ocultas): ${detail}`);
+   }
+   throw Error(geminiError(response.status,data));
+  }
   if(!data.candidates?.[0]?.content?.parts?.some(part=>typeof part.text==='string'&&part.text.trim()&&!part.thought))throw Error('Google respondió sin texto utilizable.');
   console.log('Generación correcta. Si la página falla, comprueba el modelo en Administración → Asistente IA y reinicia el servidor desde esta misma terminal.');
  }else{
