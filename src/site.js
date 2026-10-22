@@ -1,3 +1,4 @@
+import { createThemeToggle } from './theme.js';
 import { renderGallery } from './gallery.js';
 import { initDiscovery, renderStudioPhotos } from './discovery.js';
 import { api, notify } from './api.js';
@@ -7,7 +8,7 @@ const $=id=>document.getElementById(id);
 export async function initSite(){
  initChat();
  const nav=document.querySelector('nav');for(const [label,href] of [['Galería','#galeria'],['Reservas','#reservas']]){const link=document.createElement('a');link.href=href;link.textContent=label;nav.append(link);}
- const admin=document.createElement('a');admin.href='/admin';admin.textContent='Administración';admin.className='admin-link';const header=document.querySelector('#app > header');header.classList.add('studio-header');const actions=document.createElement('div');actions.className='header-actions';actions.append(header.querySelector('.contact'),admin);header.append(actions);
+ const admin=document.createElement('a');admin.href='/admin';admin.textContent='Administración';admin.className='admin-link';const header=document.querySelector('#app > header');header.classList.add('studio-header');const actions=document.createElement('div');actions.className='header-actions';actions.append(createThemeToggle(),header.querySelector('.contact'),admin);header.append(actions);
  document.querySelector('.hero').insertAdjacentHTML('afterend','<section id="nosotros" class="about-section"><div class="eyebrow">EL ESTUDIO</div><h2 id="about-title"></h2><p id="about-text"></p></section>');
  initDiscovery();
  $('biblioteca').insertAdjacentHTML('beforebegin',`<section id="galeria" class="cms-section"><div class="section-title"><div><div class="eyebrow">TRABAJOS E INSPIRACIÓN</div><h2 id="gallery-title">Galería del estudio.</h2></div><span class="badge">HECHO CON IDENTIDAD</span></div><p id="gallery-intro" class="muted"></p><div id="gallery-filters" class="gallery-filters" aria-label="Filtrar por estilo"></div><p id="gallery-message" role="status"></p><div id="gallery-grid" class="gallery-grid"></div><dialog id="gallery-dialog" class="gallery-dialog"><button id="gallery-close" aria-label="Cerrar imagen">Cerrar ×</button><img id="gallery-large" alt=""><h3 id="gallery-caption"></h3><p id="gallery-description"></p></dialog></section>`);

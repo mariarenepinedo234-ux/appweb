@@ -111,3 +111,9 @@ En **Administración → Galería**, escribe una **Nueva categoría** y pulsa **
 Las categorías que antes escribías como texto se convierten automáticamente en categorías administrables al iniciar, conservando las fotos. La galería pública muestra solo categorías con trabajos publicados, permite filtrar y recorrer las imágenes con flechas o deslizando en celular. Al abrir una imagen se puede pasar a la anterior o siguiente sin cerrar la vista; las flechas del teclado también funcionan. Se conserva **Probar un diseño similar** cuando el trabajo tiene un dibujo adjunto. El carrusel no avanza solo y respeta la preferencia de reducir movimiento.
 
 En el chat, **Enter envía la consulta** y **Shift+Enter añade una línea**. El botón Enviar sigue disponible. No se envían consultas vacías, teclas repetidas ni pulsaciones Enter durante la composición del teclado.
+
+## Temas Clásico y Futurista
+
+El botón de tema está en la parte superior de la página, en el acceso administrativo y en el panel. Alterna entre **Clásico** (la identidad original) y **Futurista** (fondos azul oscuro, detalles luminosos cian y violeta y formularios oscuros). En celular aparece como un icono para conservar espacio junto a Administración.
+
+La preferencia se guarda por navegador en `localStorage` (`inkforma-theme`), se aplica antes de mostrar la página y se mantiene al recargar o entrar al panel. Cambiarla no modifica el tema de otros visitantes ni el contenido del estudio. Si el navegador bloquea el almacenamiento, el botón sigue funcionando durante esa visita. El tema no cambia el color de piel, las imágenes ni los tatuajes del probador, ni añade animaciones automáticas.
