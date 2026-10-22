@@ -1,7 +1,9 @@
 import { api, notify } from './api.js';
+import { initChat } from './chat.js';
 import './site.css';
 const $=id=>document.getElementById(id);
 export async function initSite(){
+ initChat();
  const nav=document.querySelector('nav');for(const [label,href] of [['Galería','#galeria'],['Reservas','#reservas']]){const link=document.createElement('a');link.href=href;link.textContent=label;nav.append(link);}
  const admin=document.createElement('a');admin.href='/admin';admin.textContent='Administración';admin.className='admin-link';document.querySelector('footer').append(admin);
  document.querySelector('.hero').insertAdjacentHTML('afterend','<section id="nosotros" class="about-section"><div class="eyebrow">EL ESTUDIO</div><h2 id="about-title"></h2><p id="about-text"></p></section>');

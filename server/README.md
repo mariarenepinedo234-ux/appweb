@@ -74,3 +74,25 @@ Las solicitudes no envían correos, WhatsApp ni pagos automáticamente. El estud
 ## Pruebas
 
 `npm test` inicia una base **aislada en el directorio temporal del sistema** y una cuenta ficticia solo para pruebas. Las pruebas cubren permisos reales, sesión, origen/CSRF, privacidad de borradores, validación de imágenes, reservas y conflictos de horario, edición desde el panel, modelos publicados y el probador 3D. Esa cuenta nunca se crea mediante el arranque normal.
+
+## Asistente de tatuajes con IA
+
+El chat utiliza la API de OpenAI (Responses API, modelo `gpt-4.1-mini`). **El consumo de API se paga aparte de la suscripción de ChatGPT.** Está desactivado por defecto y no genera respuestas de IA si falta la clave. No hay respuestas simuladas en el arranque normal.
+
+Para activarlo en tu computadora, ejecuta una vez en la carpeta del proyecto:
+
+```powershell
+npm.cmd run ai:configure
+```
+
+El asistente pide una clave de la API de OpenAI sin mostrarla. Puedes crearla desde https://platform.openai.com/api-keys y configurar la facturación de esa cuenta. Nunca pegues claves en un chat, en el código ni en Git. La clave se guarda en `data/ai-key.txt` (o dentro de `APP_DATA_DIR`), fuera del repositorio, con permisos privados. Las copias de esa carpeta también contendrán la clave: mantenlas privadas. Otra opción, adecuada para alojamiento, es inyectar `INKFORMA_AI_KEY` como variable de servidor; esa variable tiene prioridad sobre el archivo. No uses variables `VITE_` para credenciales.
+
+Después entra a **Administración → Asistente IA**, añade las preguntas frecuentes y activa el asistente. El panel muestra si hay una clave configurada, no su valor; presencia no significa que la clave ya se haya validado con el proveedor. La validez se comprueba cuando se envía una consulta. Si la guardaste por archivo, no hace falta reiniciar; si añadiste una variable de entorno, reinicia el proceso para que la reciba.
+
+El bot recibe exclusivamente el texto de la conversación y la descripción/contacto/horarios/FAQ del estudio. Sus instrucciones restringen el ámbito a tatuajes, preparación y cuidados generales, el probador y el estudio; no inventa tarifas ni confirma reservas. No recibe las tablas de clientes, contraseñas ni datos privados. La especialización depende de instrucciones al modelo; no equivale a supervisión de un tatuador o un profesional sanitario.
+
+Las conversaciones se mantienen en memoria del navegador y no se guardan en SQLite. Cada pregunta y su contexto se envían a OpenAI con `store:false`; el tratamiento de datos del proveedor se rige por sus propias condiciones. El visitante recibe un aviso antes de escribir. No existe carga de fotografías al bot.
+
+El servidor limita cada conversación a 12 mensajes / 12.000 caracteres de contexto, cada pregunta a 2000 caracteres y la respuesta a 500 tokens. Admite 8 solicitudes por minuto/IP y un máximo global configurable de 1–500 intentos por día UTC, conservado en SQLite. Los errores y timeouts consumen un intento. El contador no es un presupuesto monetario exacto: configura también los límites de uso del proveedor. El endpoint de OpenAI es fijo, las claves nunca viajan al navegador y los errores no exponen detalles privados del proveedor.
+
+Las pruebas del chat usan un proveedor **simulado exclusivamente en el arranque aislado de QA**. Validan interfaz, contexto, validación, errores, permisos y cuotas sin hacer llamadas pagadas. Para validar respuestas reales hace falta una clave válida y acceso al modelo; esa validación no se ha ejecutado cuando falta la clave.

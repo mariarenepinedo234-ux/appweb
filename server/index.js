@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createServer as createHTTPServer } from 'node:http';
 import { db, dataDir, mediaDir, getSettings } from './db.js';
+import { installChat } from './chat.js';
 import { requireAdmin, sessionFrom, sameOrigin, newSession, setSessionCookie, verifyPassword, tokenHash, hashPassword } from './auth.js';
 import { text, email, bool, validateSettings, scheduledTimes, studioNow, validateGlb } from './validation.js';
 
@@ -97,6 +98,7 @@ app.put('/api/admin/bookings/:id',requireAdmin,wrap(async(req,res)=>{
  db.prepare('UPDATE bookings SET status=?,admin_note=?,day=?,time=? WHERE id=?').run(status,note,day,time,old.id);res.json(db.prepare('SELECT * FROM bookings WHERE id=?').get(old.id));
 }));
 app.delete('/api/admin/bookings/:id',requireAdmin,(req,res)=>{db.prepare('DELETE FROM bookings WHERE id=?').run(req.params.id);res.json({ok:true});});
+installChat(app);
 app.use('/api',(req,res)=>res.status(404).json({error:'Operación no disponible.'}));
 
 if(!production){const {createServer}=await import('vite');const vite=await createServer({root,server:{middlewareMode:true,hmr:{server:httpServer},fs:{deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/data/**','**/*.sqlite*',`${dataDir}/**`]}},appType:'custom'});app.use(vite.middlewares);app.get(/.*/,wrap(async(req,res)=>{const html=await vite.transformIndexHtml(req.originalUrl,await readFile(join(root,'index.html'),'utf8'));res.type('html').send(html);}));}
@@ -106,6 +108,7 @@ app.use((error,req,res,next)=>{
  if(error instanceof multer.MulterError)return res.status(400).json({error:error.code==='LIMIT_FILE_SIZE'?'El archivo supera el tamaño permitido (imagen: 10 MB; modelo: 30 MB).':'La carga no es válida.'});
  if(/UNIQUE constraint failed: bookings/.test(error.message))return res.status(409).json({error:'Otra persona acaba de solicitar ese horario. Elige otro.'});
  if(error.type==='entity.parse.failed')return res.status(400).json({error:'Solicitud JSON no válida.'});
+ if(error.public&&error.status)return res.status(error.status).json({error:error.message});
  if(error.status&&error.status<500)return res.status(error.status).json({error:error.message});
  console.error('Error de servidor:',error.code||error.name);res.status(500).json({error:'No se pudo completar la operación. Inténtalo de nuevo.'});
 });

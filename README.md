@@ -79,3 +79,7 @@ WebGL es necesario para el visor. Sin él se puede seguir subiendo y guardando i
 ## Panel de administración y base de datos
 
 Consulta [server/README.md](server/README.md) para crear la primera cuenta, editar contenido y horarios, gestionar la galería/reservas/modelos, configurar alojamiento y conservar tus datos. La base se crea y conecta automáticamente en el primer arranque; no se necesita una cuenta externa de Supabase.
+
+## Chat de tatuajes con IA
+
+Incluye un chat público especializado en tatuajes y configuración en **Administración → Asistente IA**. Para conectar una clave propia de OpenAI, usa `npm.cmd run ai:configure`; después activa el bot desde el panel. Su consumo se factura aparte de ChatGPT. La clave se guarda en el servidor, nunca en el navegador ni en Git. Sin clave, el chat muestra que no está disponible. Consulta [la guía de IA](server/README.md#asistente-de-tatuajes-con-ia) para configuración, límites y privacidad.

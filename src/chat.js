@@ -1,0 +1,23 @@
+import { api } from './api.js';
+import './chat.css';
+
+export async function initChat(){
+ const container=document.createElement('div');container.className='tattoo-chat';
+ container.innerHTML=`<button id="chat-launcher" class="chat-launcher" aria-expanded="false" aria-controls="chat-panel">Pregúntale a la IA <span aria-hidden="true">✦</span></button><section id="chat-panel" class="chat-panel" role="dialog" aria-modal="false" aria-labelledby="chat-title" hidden><header class="chat-header"><div><span>ORIENTACIÓN SOBRE TATUAJES</span><h2 id="chat-title">Asistente del estudio</h2></div><button id="chat-close" type="button" aria-label="Cerrar chat">×</button></header><div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions"></div><div id="chat-suggestions" class="chat-suggestions"><button type="button">¿Cómo preparo mi piel?</button><button type="button">¿Qué estilos de tatuajes hay?</button><button type="button">¿Cómo solicito una cita?</button></div><p id="chat-service-status" class="chat-service-status" role="status">Comprobando disponibilidad…</p><form id="chat-form" class="chat-form"><label for="chat-question">Tu pregunta sobre tatuajes</label><textarea id="chat-question" maxlength="2000" rows="2" placeholder="Escribe tu pregunta…" disabled required></textarea><div><button id="chat-clear" type="button">Nueva conversación</button><button id="chat-send" type="submit" disabled>Enviar</button></div></form><p class="chat-privacy">Tus preguntas se envían a OpenAI. No incluyas datos personales ni imágenes. Orientación general, sin diagnóstico médico. <a href="#reservas">Solicitar consulta</a></p></section>`;
+ document.body.append(container);const $=id=>container.querySelector('#'+id);let history=[],available=false,busy=false;
+ function bubble(text,role='assistant'){const element=document.createElement('p');element.className=`chat-bubble chat-${role}`;element.textContent=text;$('chat-log').append(element);$('chat-log').scrollTop=$('chat-log').scrollHeight;return element;}
+ function controls(){const disabled=!available||busy;$('chat-question').disabled=disabled;$('chat-send').disabled=disabled;$('chat-clear').disabled=busy;container.querySelectorAll('#chat-suggestions button').forEach(button=>button.disabled=disabled);}
+ let welcome='Hola. Puedo orientarte sobre tatuajes y las consultas del estudio.';
+ const open=()=>{$('chat-panel').hidden=false;$('chat-launcher').setAttribute('aria-expanded','true');(available&&!busy?$('chat-question'):$('chat-close')).focus();};
+ const close=()=>{$('chat-panel').hidden=true;$('chat-launcher').setAttribute('aria-expanded','false');$('chat-launcher').focus();};
+ $('chat-launcher').onclick=()=>{$('chat-panel').hidden?open():close();};$('chat-close').onclick=close;container.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();close();}});
+ const reset=()=>{history=[];$('chat-log').replaceChildren();bubble(welcome);$('chat-question').value='';};$('chat-clear').onclick=reset;
+ async function refreshStatus(){try{const status=await api('/api/chat/status');$('chat-title').textContent=status.name;welcome=status.welcome;available=status.available;$('chat-service-status').textContent=available?'Asistente activado · Solo preguntas sobre tatuajes y el estudio.':'El asistente no está disponible ahora. Puedes contactar al estudio o solicitar una consulta.';}catch{available=false;$('chat-service-status').textContent='No se pudo conectar con el asistente. Puedes usar la sección Reservas.';}controls();}
+ await refreshStatus();reset();
+ container.querySelectorAll('#chat-suggestions button').forEach(button=>button.onclick=()=>{$('chat-question').value=button.textContent;$('chat-form').requestSubmit();});
+ $('chat-form').onsubmit=async event=>{event.preventDefault();if(!available||busy)return;const question=$('chat-question').value.trim();if(!question)return;busy=true;controls();bubble(question,'user');$('chat-question').value='';const pending=bubble('Consultando al asistente…');pending.classList.add('chat-pending');
+  try{let messages=[...history.slice(-10),{role:'user',content:question}];while(messages.length>1&&messages.reduce((n,x)=>n+x.content.length,0)>12000)messages=messages.slice(2);const result=await api('/api/chat',{method:'POST',body:{messages}});pending.remove();bubble(result.answer);history=[...messages,{role:'assistant',content:result.answer.slice(0,2000)}];}
+  catch(error){pending.remove();bubble(error.message,'error');$('chat-question').value=question;if(error.status===429||error.status===503)await refreshStatus();}
+  finally{busy=false;controls();if(!$('chat-panel').hidden&&available)$('chat-question').focus();}
+ };
+}
