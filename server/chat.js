@@ -1,3 +1,4 @@
+import { geminiError } from './gemini-errors.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { rateLimit } from 'express-rate-limit';
@@ -11,7 +12,7 @@ const defaults={enabled:false,name:'Asistente del estudio',welcome:'Hola. ¿Tien
 db.prepare('INSERT OR IGNORE INTO chat_settings(id,content) VALUES(1,?)').run(JSON.stringify(defaults));
 export const getChatSettings=()=>({...defaults,...JSON.parse(db.prepare('SELECT content FROM chat_settings WHERE id=1').get().content)});
 export function readAIKey(){if(process.env.INKFORMA_GEMINI_KEY?.trim())return process.env.INKFORMA_GEMINI_KEY.trim();try{return readFileSync(join(dataDir,'gemini-key.txt'),'utf8').trim();}catch{return '';}}
-const model=process.env.INKFORMA_GEMINI_MODEL||'gemini-2.5-flash-lite';
+export const model=process.env.INKFORMA_GEMINI_MODEL||'gemini-2.5-flash-lite';
 if(!/^[a-zA-Z0-9._-]+$/.test(model))throw new Error('INKFORMA_GEMINI_MODEL no válido.');
 const today=()=>new Date().toISOString().slice(0,10);
 const used=()=>db.prepare('SELECT calls FROM chat_usage WHERE day=?').get(today())?.calls||0;
@@ -36,9 +37,8 @@ export function installChat(app,{fetchImpl=globalThis.fetch}={}){
    const quota=db.prepare('INSERT INTO chat_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=calls+1 WHERE calls<? RETURNING calls').get(today(),settings.dailyLimit);if(!quota)error('El asistente alcanzó su límite de consultas de hoy.',429);
    let response;
    try{response=await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:buildInstructions(getSettings(),settings)}]},contents:messages.map(message=>({role:message.role==='assistant'?'model':'user',parts:[{text:message.content}]})),generationConfig:{maxOutputTokens:500}}),signal:AbortSignal.timeout(25000)});}catch{error('No se pudo obtener una respuesta de IA. Inténtalo más tarde o contacta con el estudio.',503);}
-   if(response.status===429)error('Gemini alcanzó su cuota disponible. Espera e inténtalo más tarde o contacta con el estudio.',429);
-   if(!response.ok)error('El servicio de IA no pudo responder. Inténtalo más tarde o contacta con el estudio.',503);
    let data;try{data=await response.json();}catch{error('El servicio de IA devolvió una respuesta no disponible. Inténtalo de nuevo.',503);}
+   if(!response.ok)error(geminiError(response.status,data),response.status===429?429:503);
    const answer=(data.candidates?.[0]?.content?.parts||[]).filter(part=>!part.thought&&typeof part.text==='string').map(part=>part.text).join('\n').trim();
    if(!answer)error('La IA no pudo generar una respuesta. Reformula tu pregunta o contacta con el estudio.',503);
    res.json({answer});

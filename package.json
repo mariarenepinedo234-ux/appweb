@@ -10,7 +10,8 @@
     "test": "playwright test",
     "start": "node server/index.js --production",
     "admin:create": "node scripts/create-admin.mjs",
-    "ai:configure": "node scripts/configure-ai.mjs"
+    "ai:configure": "node scripts/configure-ai.mjs",
+    "ai:check": "node scripts/check-ai.mjs"
   },
   "dependencies": {
     "express": "^5.3.0",

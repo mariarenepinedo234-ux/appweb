@@ -100,3 +100,9 @@ Las pruebas del chat usan un proveedor **simulado exclusivamente en el arranque 
 Si ya tenías OpenAI configurado, ejecuta de nuevo `npm.cmd run ai:configure`: la clave anterior no se reutiliza ni se elimina. Se conservan la base de datos, galería, reservas y ajustes del asistente. Después reinicia el servidor y revisa su activación en el administrador.
 
 Si el modelo deja de estar disponible, el responsable del servidor puede indicar un modelo Gemini compatible mediante `INKFORMA_GEMINI_MODEL` y reiniciar. Comprueba primero que tenga cuota gratuita. El servidor no selecciona otro modelo automáticamente. Ante una cuota agotada (HTTP 429), el chat pide esperar; no se cambia a un plan de pago. Una clave inválida, un modelo no disponible o una respuesta bloqueada muestran un error seguro sin revelar detalles del proveedor. Si tu alojamiento limita salidas de red, permite HTTPS hacia `generativelanguage.googleapis.com`.
+
+### Diagnosticar errores de Gemini
+
+Ejecuta `npm.cmd run ai:check`. Solo consulta la lista de modelos: no envía conversaciones ni genera respuestas, y nunca muestra la clave. Comprueba conectividad, aceptación de la clave y si el modelo configurado aparece. La disponibilidad en esa lista no garantiza cuota gratuita de generación; revísala en Google AI Studio. Los errores de permisos, clave, modelo y cuota ahora tienen mensajes distintos.
+
+Si el modelo no aparece, el diagnóstico muestra modelos accesibles. Comprueba la cuota gratuita del modelo elegido y, en PowerShell, establece `$env:INKFORMA_GEMINI_MODEL="ID_DEL_MODELO"`; después inicia `npm.cmd run dev` en esa misma terminal. No se cambia de modelo ni se activa facturación automáticamente. Si la clave es rechazada, vuelve a ejecutar `npm.cmd run ai:configure`. Si hay una variable `INKFORMA_GEMINI_KEY` inyectada en el servidor, tiene prioridad: actualízala en la configuración de tu alojamiento.

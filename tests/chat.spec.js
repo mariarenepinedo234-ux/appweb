@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { geminiError } from '../server/gemini-errors.js';
 import { buildInstructions, validateMessages } from '../server/chat-prompt.js';
 const headers={Origin:'http://127.0.0.1:5195'};
 const settings={enabled:true,name:'Asistente de prueba',welcome:'Pregúntame sobre tu próximo tatuaje.',knowledge:'No se han publicado precios. Las consultas se solicitan en Reservas.',dailyLimit:50};
@@ -39,4 +40,14 @@ test('visitor chat works with simulated AI, preserves turns and clears the conve
  await page.getByRole('button',{name:'Cerrar chat'}).click();await expect(page.locator('#chat-panel')).toBeHidden();
  await page.context().addCookies((await request.storageState()).cookies);await page.goto('/admin');await page.getByRole('button',{name:'Asistente IA',exact:true}).click();await expect(page.getByLabel('Nombre del asistente',{exact:true})).toHaveValue('Asistente de prueba');
  await page.getByLabel('Activar el asistente público').uncheck();await page.getByRole('button',{name:'Guardar asistente'}).click();await expect(page.locator('#admin-message')).toContainText('Asistente actualizado');
+});
+
+test('Gemini diagnoses credentials, access, missing models and quotas without exposing provider details',()=>{
+ const secret={error:{message:'PRIVATE_KEY_AND_PROVIDER_DETAILS',details:[{reason:'API_KEY_INVALID'}]}};
+ expect(geminiError(400,secret)).toContain('rechazó la clave');
+ expect(geminiError(403,{})).toContain('permisos');
+ expect(geminiError(404,{})).toContain('modelo');
+ expect(geminiError(429,{})).toContain('cuota');
+ expect(geminiError(503,{})).toContain('temporalmente');
+ for(const status of [400,401,403,404,429,500])expect(geminiError(status,secret)).not.toContain('PRIVATE_KEY');
 });
