@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync,rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { geminiError } from '../server/gemini-errors.js';
 import { buildInstructions, validateMessages } from '../server/chat-prompt.js';
@@ -50,4 +54,19 @@ test('Gemini diagnoses credentials, access, missing models and quotas without ex
  expect(geminiError(429,{})).toContain('cuota');
  expect(geminiError(503,{})).toContain('temporalmente');
  for(const status of [400,401,403,404,429,500])expect(geminiError(status,secret)).not.toContain('PRIVATE_KEY');
+});
+
+test('direct generation diagnostic reports the effective model and HTTP error without leaking secrets',()=>{
+ for(const status of [200,404]){
+  const directory=mkdtempSync(join(tmpdir(),'inkforma-test-diagnostic-'));
+  try{
+   const fixture=status===200?{candidates:[{content:{parts:[{text:'conexión correcta'}]}}]}:{error:{status:'NOT_FOUND',message:'PRIVATE_PROVIDER_DETAIL'}};
+   const code=`process.argv.push('--generate');globalThis.fetch=async(url,options)=>{if(!url.endsWith('/gemini-test:generateContent')||JSON.parse(options.body).contents[0].role!=='user')throw Error('wrong request');return new Response(JSON.stringify(${JSON.stringify(fixture)}),{status:${status}});};await import('./scripts/check-ai.mjs');`;
+   const result=spawnSync(process.execPath,['--input-type=module','-e',code],{cwd:process.cwd(),env:{...process.env,APP_DATA_DIR:directory,INKFORMA_GEMINI_KEY:'fake-private-test-key',INKFORMA_GEMINI_MODEL:'gemini-test'},encoding:'utf8'});
+   expect(result.status).toBe(status===200?0:1);
+   const output=result.stdout+result.stderr;
+   expect(output).toContain(`HTTP ${status}`);expect(output).toContain('gemini-test');
+   expect(output).not.toContain('PRIVATE_PROVIDER_DETAIL');expect(output).not.toContain('fake-private-test-key');
+  }finally{rmSync(directory,{recursive:true,force:true});}
+ }
 });

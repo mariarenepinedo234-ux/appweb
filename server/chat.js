@@ -1,3 +1,4 @@
+import { geminiRequest } from './gemini-request.js';
 import { geminiError } from './gemini-errors.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,7 +37,7 @@ export function installChat(app,{fetchImpl=globalThis.fetch}={}){
    if(used()>=settings.dailyLimit)error('El asistente alcanzó su límite de consultas de hoy. Puedes contactar directamente con el estudio.',429);
    const quota=db.prepare('INSERT INTO chat_usage(day,calls) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET calls=calls+1 WHERE calls<? RETURNING calls').get(today(),settings.dailyLimit);if(!quota)error('El asistente alcanzó su límite de consultas de hoy.',429);
    let response;
-   try{response=await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({systemInstruction:{parts:[{text:buildInstructions(getSettings(),settings)}]},contents:messages.map(message=>({role:message.role==='assistant'?'model':'user',parts:[{text:message.content}]})),generationConfig:{maxOutputTokens:500}}),signal:AbortSignal.timeout(25000)});}catch{error('No se pudo obtener una respuesta de IA. Inténtalo más tarde o contacta con el estudio.',503);}
+   try{response=await fetchImpl(...geminiRequest(model,key,messages,buildInstructions(getSettings(),settings)));}catch{error('No se pudo obtener una respuesta de IA. Inténtalo más tarde o contacta con el estudio.',503);}
    let data;try{data=await response.json();}catch{error('El servicio de IA devolvió una respuesta no disponible. Inténtalo de nuevo.',503);}
    if(!response.ok)error(geminiError(response.status,data),response.status===429?429:503);
    const answer=(data.candidates?.[0]?.content?.parts||[]).filter(part=>!part.thought&&typeof part.text==='string').map(part=>part.text).join('\n').trim();
