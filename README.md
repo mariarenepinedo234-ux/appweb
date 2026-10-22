@@ -1,17 +1,18 @@
 # INKFORMA — Estudio de tatuajes
 
-Web de estudio con probador anatómico 3D, creada con JavaScript, Vite y Three.js. INKFORMA es un nombre provisional; personalizar información y contacto antes de publicar.
+App web de estudio con probador anatómico 3D, panel de administración, galería y reservas. Usa JavaScript, Vite, Three.js, un servidor Node.js/Express y SQLite. INKFORMA es un nombre provisional; personalizar información y contacto antes de publicar.
 
 ## Ejecutar en Windows
 
-Instalar Node.js 22.12 o superior y abrir una terminal en la carpeta que contiene `package.json`:
+Detén la versión anterior con Ctrl+C en su terminal. Instala Node.js 22.13 o superior (se recomienda Node.js 24 LTS) y abrir una terminal en la carpeta que contiene `package.json`:
 
 ```powershell
 npm.cmd install
+npm.cmd run admin:create
 npm.cmd run dev
 ```
 
-Abrir la dirección que muestra Vite. Mantener abierta la terminal. Para obtener esta versión desde GitHub, descargar de nuevo **Code → Download ZIP**, descomprimir en una carpeta nueva y ejecutar esos comandos. Los modelos GLB ya vienen incluidos; no hace falta instalar Blender.
+Abre la aplicación en el puerto que muestra el servidor (por defecto 5173). Añade `/admin` a su dirección para entrar al panel. `admin:create` solo hace falta para crear tu primera cuenta; consulta [la guía del servidor](server/README.md). Mantener abierta la terminal. Para obtener esta versión desde GitHub, descargar de nuevo **Code → Download ZIP**, descomprimir y ejecutar esos comandos. Si ya tienes datos de esta versión, conserva tu carpeta `data/` al actualizar o usa `APP_DATA_DIR` para mantenerla fuera del proyecto. Los modelos GLB ya vienen incluidos; no hace falta instalar Blender.
 
 ## Entorno de desarrollo
 
@@ -23,7 +24,7 @@ npm ci --cache /tmp/inkforma-npm
 npm run dev -- --port 5173
 ```
 
-`npm run build` genera producción en `dist/`; `npm run preview` permite comprobarla. Publicar el contenido de `dist/` en un alojamiento estático situado en la raíz de un dominio. Si se usa una subcarpeta, configurar `base` de Vite antes de compilar.
+`npm run build` genera producción en `dist/`; `npm run preview` permite comprobarla. Para producción ejecuta `npm start` después de compilar. Esta versión requiere un servidor Node.js con almacenamiento persistente; GitHub Pages por sí solo ya no ejecuta sus reservas ni el panel. Configuración y copias de seguridad en [server/README.md](server/README.md).
 
 ## Usar el probador
 
@@ -73,4 +74,8 @@ En PowerShell usar `npm.cmd` y `npx.cmd`. Las pruebas usan Chromium instalado co
 
 Las pruebas cubren aislamiento de zonas en ambos modelos, visibilidad del brazalete en cuatro ángulos, recuperación de ajustes de envoltura, las seis variantes de anatomía, quitar fondo claro, arrastre y colocación, separación entre cámara y diseño, recuperación de posición, exportación, gestos táctiles, anchura móvil y recuperación tras errores al cargar modelos.
 
-WebGL es necesario para el visor. Sin él se puede seguir subiendo y guardando imágenes. Las fuentes de Google son opcionales, con tipografías de respaldo. La web no incluye backend, autenticación, reservas ni pagos.
+WebGL es necesario para el visor. Sin él se puede seguir subiendo y guardando imágenes. Las fuentes de Google son opcionales, con tipografías de respaldo. La app incluye backend, autenticación de administradores, galería, edición de contenido, horarios y reservas. No incluye pagos ni avisos automáticos por correo/WhatsApp. La biblioteca personal del probador sigue siendo local al navegador; las reservas, los trabajos del estudio y el contenido se guardan en SQLite.
+
+## Panel de administración y base de datos
+
+Consulta [server/README.md](server/README.md) para crear la primera cuenta, editar contenido y horarios, gestionar la galería/reservas/modelos, configurar alojamiento y conservar tus datos. La base se crea y conecta automáticamente en el primer arranque; no se necesita una cuenta externa de Supabase.

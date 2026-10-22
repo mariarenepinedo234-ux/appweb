@@ -127,6 +127,8 @@ test('zone and wrap controls restore from the library',async({page})=>{
 
 for(const sex of ['masculino','femenino']){
  test(`all section choices work on the ${sex} model`,async({page})=>{
+  // Eleven full WebGL readbacks per model take longer on software-rendered CI.
+  test.setTimeout(90000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));await openStudio(page);
   await page.locator('#sex').selectOption(sex);await expect(page.locator('#canvas')).toHaveAttribute('data-model-state','ready');
   for(const zone of ['arm-left','arm-right','forearm-left','forearm-right','upperarm-left','upperarm-right','calf-left','calf-right','chest','back','full']){

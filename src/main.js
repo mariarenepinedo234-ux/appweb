@@ -4,7 +4,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { zones, resolveZone, isolateGeometry, limbFrame, bandGeometry } from './anatomy.js';
+import { initSite } from './site.js';
 
+if(location.pathname==='/admin'||location.pathname.startsWith('/admin/')){
+ const {initAdmin}=await import('./admin.js');await initAdmin();
+}else{
 const $ = id => document.getElementById(id);
 document.querySelector('#app').innerHTML = `
 <header><a class="brand" href="#">INKFORMA<span> TATTOO STUDIO</span></a><nav><a href="#estudio">El estudio</a><a href="#experiencia">Probador 3D</a><a href="#biblioteca">Tu biblioteca</a></nav><a class="contact" href="#contacto">Hablemos ↗</a></header>
@@ -30,22 +34,33 @@ const fill=new THREE.DirectionalLight(0xffffff,.7);fill.position.set(-3,2,4);sce
 const body=new THREE.Group();scene.add(body);let surfaces=[],fullSurface=null,activeModel=null,zoneMesh=null,zoneFrame=null;
 const skin=new THREE.MeshStandardMaterial({color:$('skin').value,roughness:.57,metalness:0});
 const eyeMaterial=new THREE.MeshStandardMaterial({color:0xada394,roughness:.48});
-const loader=new GLTFLoader(),models=new Map();let modelRequest=0;
+const loader=new GLTFLoader(),models=new Map(),customCatalog=new Map();let modelRequest=0,selectedCustomModel=null;
 async function makeBody(){
- const request=++modelRequest;const sex=$('sex').value,build=$('build').value;const gender=sex==='femenino'?'female':'male';
+ const request=++modelRequest;const sex=$('sex').value,build=$('build').value;const gender=sex==='femenino'?'female':'male';const custom=selectedCustomModel,cacheKey=custom?`custom:${custom.id}`:gender,modelURL=custom?custom.url:`${import.meta.env.BASE_URL}models/${gender}.glb`;
  $('canvas').dataset.modelState='loading';$('model-label').textContent='CARGANDO ANATOMÍA…';
  if(renderer)$('status').textContent='Preparando el modelo anatómico…';
  try{
-  if(!models.has(gender))models.set(gender,loader.loadAsync(`${import.meta.env.BASE_URL}models/${gender}.glb`).catch(error=>{models.delete(gender);throw error;}));
-  const gltf=await models.get(gender);if(request!==modelRequest)return;
-  const variant=gltf.scene.getObjectByName(build);if(!variant)throw Error('Variante no disponible');
-  clearDecal();if(zoneMesh)zoneMesh.geometry.dispose();zoneMesh=null;body.clear();surfaces=[];const model=variant.clone(true);activeModel=model;
+  if(!models.has(cacheKey))models.set(cacheKey,loader.loadAsync(modelURL).catch(error=>{models.delete(cacheKey);throw error;}));
+  const gltf=await models.get(cacheKey);if(request!==modelRequest)return;
+  const variant=custom?normalizeCustomModel(gltf.scene):gltf.scene.getObjectByName(build);if(!variant)throw Error('Variante no disponible');
+  clearDecal();if(activeModel?.userData.custom)activeModel.traverse(mesh=>{if(mesh.isMesh)mesh.geometry.dispose();});if(zoneMesh)zoneMesh.geometry.dispose();zoneMesh=null;body.clear();surfaces=[];const model=variant.clone(true);activeModel=model;
   model.traverse(mesh=>{if(!mesh.isMesh)return;mesh.castShadow=true;mesh.receiveShadow=true;if(mesh.name.endsWith('-body')){mesh.material=skin;surfaces.push(mesh);}else mesh.material=eyeMaterial;});
-  fullSurface=surfaces[0];body.add(model);body.updateMatrixWorld(true);applyZone();$('canvas').dataset.modelState='ready';$('canvas').dataset.bodyModel=`${gender}-${build}`;
-  $('model-label').textContent=`${sex.toUpperCase()} / ${build.toUpperCase()} / MALLA ANATÓMICA`;
-  if(renderer)$('status').textContent=texture?'Modelo listo. Arrastra sobre la piel para volver a colocar el tatuaje.':'Modelo listo. Sube tu diseño para probarlo sobre la piel.';
+  fullSurface=surfaces[0];body.add(model);body.updateMatrixWorld(true);applyZone();$('canvas').dataset.modelState='ready';$('canvas').dataset.bodyModel=custom?`custom-${custom.id}`:`${gender}-${build}`;
+  $('model-label').textContent=custom?custom.title.toUpperCase():`${sex.toUpperCase()} / ${build.toUpperCase()} / MALLA ANATÓMICA`;
+  if(renderer)$('status').textContent=custom?'Modelo del estudio listo. Admite diseños localizados; las zonas y brazaletes usan los modelos incluidos.':texture?'Modelo listo. Arrastra sobre la piel para volver a colocar el tatuaje.':'Modelo listo. Sube tu diseño para probarlo sobre la piel.';
  }catch(error){if(request!==modelRequest)return;$('canvas').dataset.modelState='error';$('model-label').textContent='NO SE PUDO CARGAR EL MODELO';$('status').textContent='No se pudo cargar la anatomía. Comprueba la conexión y cambia de modelo para reintentar.';console.error('Carga del modelo:',error);}
 }
+function normalizeCustomModel(source){
+ const original=source.clone(true);original.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(original),height=bounds.max.y-bounds.min.y;
+ if(!Number.isFinite(height)||height<=0)throw Error('El modelo no tiene una altura válida.');
+ const center=bounds.getCenter(new THREE.Vector3()),scale=3/height,transform=new THREE.Matrix4().makeScale(scale,scale,scale).multiply(new THREE.Matrix4().makeTranslation(-center.x,-bounds.min.y,-center.z));
+ const positions=[],normals=[];original.traverse(mesh=>{if(!mesh.isMesh)return;const geometry=(mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone()).applyMatrix4(new THREE.Matrix4().multiplyMatrices(transform,mesh.matrixWorld));if(!geometry.attributes.normal)geometry.computeVertexNormals();positions.push(geometry.attributes.position.array);normals.push(geometry.attributes.normal.array);geometry.dispose();});
+ const concat=arrays=>{const result=new Float32Array(arrays.reduce((sum,a)=>sum+a.length,0));let offset=0;arrays.forEach(a=>{result.set(a,offset);offset+=a.length;});return result;};
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(concat(positions),3));geometry.setAttribute('normal',new THREE.BufferAttribute(concat(normals),3));geometry.computeBoundingSphere();const group=new THREE.Group(),mesh=new THREE.Mesh(geometry,skin);mesh.name='custom-body';group.add(mesh);group.userData.custom=true;return group;
+}
+window.addEventListener('inkforma:models',event=>event.detail.forEach(model=>customCatalog.set(model.id,model)));
+function chooseCustomModel(model){selectedCustomModel=model;$('sex').disabled=$('build').disabled=!!model;$('zone').disabled=!!model;$('application').querySelector('[value=band]').disabled=!!model;$('demo-band').disabled=!!model;if(model){$('zone').value='full';$('application').value='decal';}if($('custom-model'))$('custom-model').value=model?.id||'builtin';}
+window.addEventListener('inkforma:select-model',event=>{chooseCustomModel(event.detail);makeBody();});
 const floor=new THREE.Mesh(new THREE.CylinderGeometry(1.08,1.12,.06,96),new THREE.MeshStandardMaterial({color:0x313d3c,roughness:.8}));floor.position.y=-.055;floor.receiveShadow=true;scene.add(floor);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x192122,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.09;ground.receiveShadow=true;scene.add(ground);
 const grid=new THREE.GridHelper(10,40,0x61716c,0x3a4845);grid.position.y=-.085;grid.material.transparent=true;grid.material.opacity=.25;scene.add(grid);
@@ -161,7 +176,9 @@ $('demo-band').onclick=()=>{
 $('export').onclick=()=>{if(!renderer)return;renderer.render(scene,camera);download(renderer.domElement.toDataURL('image/png'),'inkforma-vista.png');};
 function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;a.click();}
 function persist(next){try{localStorage.setItem('inkforma-library',JSON.stringify(next));library=next;renderLibrary();return true;}catch{$('status').textContent='No hay espacio local disponible. Descarga tu diseño antes de continuar.';return false;}}
-$('save').onclick=()=>{if(!texture)return;const next=[{id:crypto.randomUUID(),image:texture.image.toDataURL('image/png'),date:new Date().toLocaleDateString('es'),sex:$('sex').value,build:$('build').value,skin:$('skin').value,zone:$('zone').value,isolate:$('isolate').checked,placement:placement?{point:placement.point.toArray(),normal:placement.normal.toArray(),size:Number($('size').value),rotation:Number($('rotation').value),opacity:Number($('opacity').value),flipped,application:$('application').value,bandPosition:Number($('band-position').value),repeats:Number($('band-repeat').value)}:null},...library];if(persist(next))$('status').textContent='Diseño guardado en la biblioteca de este navegador.';};
-function renderLibrary(){$('count').textContent=`${library.length} DISEÑOS`;$('library').replaceChildren();if(!library.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Tu próxima idea tiene un lugar aquí. Sube un diseño y guárdalo para empezar.';$('library').append(empty);}library.forEach((item,i)=>{const card=document.createElement('article');card.className='design-card';const img=document.createElement('img');img.src=item.image;img.alt=`Diseño de tatuaje ${i+1}`;const caption=document.createElement('p');caption.textContent=`Diseño ${library.length-i} · ${item.date}`;const actions=document.createElement('div');for(const [label,action] of [['Usar',async()=>{if(item.skin){$('skin').value=item.skin;skin.color.set(item.skin);$('sex').value=item.sex;$('build').value=item.build;$('zone').value=zones[item.zone]?item.zone:'full';$('isolate').checked=item.isolate ?? true;await makeBody();}$('remove').checked=false;loadImage(item.image,item.placement);$('experiencia').scrollIntoView({behavior:'smooth'});}],['Descargar',()=>download(item.image,'inkforma-tatuaje.png')],['Eliminar',()=>persist(library.filter(x=>x.id!==item.id))]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;actions.append(b);}card.append(img,caption,actions);$('library').append(card);});}
-makeBody();renderLibrary();
+$('save').onclick=()=>{if(!texture)return;const next=[{id:crypto.randomUUID(),image:texture.image.toDataURL('image/png'),date:new Date().toLocaleDateString('es'),sex:$('sex').value,build:$('build').value,skin:$('skin').value,customModelId:selectedCustomModel?.id||null,zone:$('zone').value,isolate:$('isolate').checked,placement:placement?{point:placement.point.toArray(),normal:placement.normal.toArray(),size:Number($('size').value),rotation:Number($('rotation').value),opacity:Number($('opacity').value),flipped,application:$('application').value,bandPosition:Number($('band-position').value),repeats:Number($('band-repeat').value)}:null},...library];if(persist(next))$('status').textContent='Diseño guardado en la biblioteca de este navegador.';};
+function renderLibrary(){$('count').textContent=`${library.length} DISEÑOS`;$('library').replaceChildren();if(!library.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Tu próxima idea tiene un lugar aquí. Sube un diseño y guárdalo para empezar.';$('library').append(empty);}library.forEach((item,i)=>{const card=document.createElement('article');card.className='design-card';const img=document.createElement('img');img.src=item.image;img.alt=`Diseño de tatuaje ${i+1}`;const caption=document.createElement('p');caption.textContent=`Diseño ${library.length-i} · ${item.date}`;const actions=document.createElement('div');for(const [label,action] of [['Usar',async()=>{if(item.skin){if(item.customModelId&&!customCatalog.has(item.customModelId)){$('status').textContent='El modelo guardado ya no está publicado o no se pudo cargar. El diseño sigue disponible para descargar.';return;}chooseCustomModel(item.customModelId?customCatalog.get(item.customModelId):null);$('skin').value=item.skin;skin.color.set(item.skin);$('sex').value=item.sex;$('build').value=item.build;$('zone').value=zones[item.zone]?item.zone:'full';$('isolate').checked=item.isolate ?? true;await makeBody();}$('remove').checked=false;loadImage(item.image,item.placement);$('experiencia').scrollIntoView({behavior:'smooth'});}],['Descargar',()=>download(item.image,'inkforma-tatuaje.png')],['Eliminar',()=>persist(library.filter(x=>x.id!==item.id))]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;actions.append(b);}card.append(img,caption,actions);$('library').append(card);});}
+makeBody();renderLibrary();initSite();
 if(renderer){const observer=new ResizeObserver(()=>{const w=$('canvas').clientWidth,h=$('canvas').clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();});observer.observe($('canvas'));renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});}
+
+}
