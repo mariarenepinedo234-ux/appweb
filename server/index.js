@@ -104,10 +104,10 @@ app.post('/api/bookings',bookingLimit,wrap(async(req,res)=>{
 app.get('/api/admin/bookings',requireAdmin,(req,res)=>res.json(db.prepare('SELECT * FROM bookings ORDER BY day DESC,time DESC LIMIT 1000').all()));
 app.put('/api/admin/bookings/:id',requireAdmin,wrap(async(req,res)=>{
  const old=db.prepare('SELECT * FROM bookings WHERE id=?').get(req.params.id);if(!old)fail('La reserva no existe.',404);const status=input(()=>text(req.body.status,'Estado',20,1));if(!['pending','confirmed','cancelled','completed'].includes(status))fail('Estado no válido.');
- const note=input(()=>text(req.body.admin_note??'','Nota interna',2000)),day=input(()=>text(req.body.day??old.day,'Fecha',10,10)),time=input(()=>text(req.body.time??old.time,'Hora',5,5));
+ const note=input(()=>text(req.body.admin_note??old.admin_note,'Nota interna',2000)),clientNote=input(()=>text(req.body.client_note??old.client_note,'Observaciones para el cliente',1500)),phone=input(()=>text(req.body.phone??old.phone,'Teléfono',40,6)),day=input(()=>text(req.body.day??old.day,'Fecha',10,10)),time=input(()=>text(req.body.time??old.time,'Hora',5,5));
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||Number.isNaN(new Date(day+'T12:00:00Z').valueOf())||new Date(day+'T12:00:00Z').toISOString().slice(0,10)!==day||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))fail('La fecha o la hora no son válidas.');
  if((day!==old.day||time!==old.time||old.status==='cancelled')&&['pending','confirmed'].includes(status)){const times=input(()=>scheduledTimes(day,getSettings()));if(!times.includes(time))fail('La nueva fecha no está dentro del horario de atención.');}
- db.prepare('UPDATE bookings SET status=?,admin_note=?,day=?,time=? WHERE id=?').run(status,note,day,time,old.id);res.json(db.prepare('SELECT * FROM bookings WHERE id=?').get(old.id));
+ db.prepare('UPDATE bookings SET status=?,admin_note=?,client_note=?,phone=?,day=?,time=? WHERE id=?').run(status,note,clientNote,phone,day,time,old.id);res.json(db.prepare('SELECT * FROM bookings WHERE id=?').get(old.id));
 }));
 app.delete('/api/admin/bookings/:id',requireAdmin,(req,res)=>{db.prepare('DELETE FROM bookings WHERE id=?').run(req.params.id);res.json({ok:true});});
 installChat(app);
